@@ -52,7 +52,7 @@ class HomeScreen extends StatelessWidget {
               ),
               const SizedBox(height: 48),
 
-              // Logout Button
+              //logout btn
               OutlinedButton.icon(
                 onPressed: () => _handleLogout(context),
                 icon: const Icon(Icons.logout, color: Color.fromARGB(255, 1, 4, 104)),

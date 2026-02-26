@@ -13,7 +13,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final TextEditingController _passwordController = TextEditingController();
 
   void _handleLogin() {
-    // Basic validation — no backend yet
+    //no backend yet
     if (_emailController.text.isNotEmpty &&
         _passwordController.text.isNotEmpty) {
       Navigator.pushReplacement(
@@ -48,7 +48,7 @@ class _LoginScreenState extends State<LoginScreen> {
             mainAxisAlignment: MainAxisAlignment.center,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // App Logo / Title
+              //app logo title
               const Icon(
                 Icons.music_note,
                 size: 80,
@@ -71,7 +71,7 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
               const SizedBox(height: 48),
 
-              // Email Field
+              //email 
               TextField(
                 controller: _emailController,
                 keyboardType: TextInputType.emailAddress,
@@ -85,7 +85,7 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
               const SizedBox(height: 16),
 
-              // Password Field
+              //password 
               TextField(
                 controller: _passwordController,
                 obscureText: true,
@@ -99,7 +99,7 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
               const SizedBox(height: 28),
 
-              // Login Button
+              //login btn
               ElevatedButton(
                 onPressed: _handleLogin,
                 style: ElevatedButton.styleFrom(
