@@ -14,7 +14,7 @@ class WTeamsApp extends StatelessWidget {
       title: 'w_teams',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: const Color.fromARGB(255, 7, 1, 96)),
+        colorScheme: ColorScheme.fromSeed(seedColor: const Color.fromARGB(255, 1, 4, 104)),
         useMaterial3: true,
       ),
       home: const LoginScreen(),
