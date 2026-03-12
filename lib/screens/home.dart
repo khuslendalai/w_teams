@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'login_screen.dart';
-import 'songs_screen.dart' ;
+import 'signup_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   final String email;

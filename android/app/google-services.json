@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "729109950049",
+    "project_id": "wteams-c478f",
+    "storage_bucket": "wteams-c478f.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:729109950049:android:d6aa946ae3f73fec2bc420",
+        "android_client_info": {
+          "package_name": "com.example.flutter_demo"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBFqyq3jfcPR02GeBA0FoAsEhzByDYJQO0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:729109950049:android:dae40212c7e1bc202bc420",
+        "android_client_info": {
+          "package_name": "com.example.w_teams"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBFqyq3jfcPR02GeBA0FoAsEhzByDYJQO0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
