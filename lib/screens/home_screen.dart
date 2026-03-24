@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import 'login_screen.dart';
-import 'songs_screen.dart' ;
+import 'songs_screen.dart';
+import 'schedules_screen.dart';
+import 'teams_screen.dart';
+import 'settings_screen.dart';
+
 
 class HomeScreen extends StatefulWidget {
   final String email;
@@ -21,7 +25,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // ── Pages ─────────────────────────────────────────────────
   final List<String> _pageTitles = [
     'Home', 'Songs', 'Schedule', 'Teams', 'Settings'
   ];
@@ -30,10 +33,10 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     final List<Widget> pages = [
       _buildDashboard(),
-      _buildPlaceholder(Icons.music_note_outlined, 'Songs'),
-      _buildPlaceholder(Icons.calendar_month_outlined, 'Schedule'),
-      _buildPlaceholder(Icons.people_alt_outlined, 'Teams'),
-      _buildSettings(context),
+      const SongsScreen(),
+      const ScheduleScreen(),
+      const TeamsScreen(),
+      SettingsScreen(email: widget.email),
     ];
 
     const appColor = Color.fromARGB(255, 1, 4, 104);
@@ -46,7 +49,6 @@ class _HomeScreenState extends State<HomeScreen> {
         automaticallyImplyLeading: false,
         title: Row(
           children: [
-            // Avatar circle
             CircleAvatar(
               radius: 16,
               backgroundColor: Colors.white24,
@@ -206,13 +208,15 @@ class _HomeScreenState extends State<HomeScreen> {
                 Container(
                   height: 130,
                   decoration: const BoxDecoration(
-                    borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+                    borderRadius:
+                        BorderRadius.vertical(top: Radius.circular(16)),
                     color: Color(0xFF1A1A2E),
                   ),
                   child: Stack(
                     children: [
                       const Center(
-                        child: Icon(Icons.church, color: Colors.white24, size: 64),
+                        child: Icon(Icons.church,
+                            color: Colors.white24, size: 64),
                       ),
                       Positioned(
                         bottom: 10,
@@ -259,8 +263,8 @@ class _HomeScreenState extends State<HomeScreen> {
                               size: 13, color: Colors.grey),
                           SizedBox(width: 4),
                           Text('Nov 12, 9:00 AM',
-                              style:
-                                  TextStyle(fontSize: 12, color: Colors.grey)),
+                              style: TextStyle(
+                                  fontSize: 12, color: Colors.grey)),
                         ],
                       ),
                       const SizedBox(height: 12),
@@ -281,8 +285,8 @@ class _HomeScreenState extends State<HomeScreen> {
                             SizedBox(width: 6),
                             Text(
                               'Assigned Role:  ',
-                              style:
-                                  TextStyle(fontSize: 12, color: Colors.grey),
+                              style: TextStyle(
+                                  fontSize: 12, color: Colors.grey),
                             ),
                             Text(
                               'Acoustic Guitar',
@@ -303,14 +307,16 @@ class _HomeScreenState extends State<HomeScreen> {
                           Expanded(
                             child: ElevatedButton.icon(
                               onPressed: () {},
-                              icon: const Icon(Icons.check_circle_outline,
+                              icon: const Icon(
+                                  Icons.check_circle_outline,
                                   size: 16),
                               label: const Text('Accept'),
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: appColor,
                                 foregroundColor: Colors.white,
                                 shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(10)),
+                                    borderRadius:
+                                        BorderRadius.circular(10)),
                               ),
                             ),
                           ),
@@ -318,13 +324,16 @@ class _HomeScreenState extends State<HomeScreen> {
                           Expanded(
                             child: OutlinedButton.icon(
                               onPressed: () {},
-                              icon: const Icon(Icons.cancel_outlined, size: 16),
+                              icon: const Icon(Icons.cancel_outlined,
+                                  size: 16),
                               label: const Text('Decline'),
                               style: OutlinedButton.styleFrom(
                                 foregroundColor: Colors.grey,
-                                side: const BorderSide(color: Colors.grey),
+                                side: const BorderSide(
+                                    color: Colors.grey),
                                 shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(10)),
+                                    borderRadius:
+                                        BorderRadius.circular(10)),
                               ),
                             ),
                           ),
@@ -341,8 +350,8 @@ class _HomeScreenState extends State<HomeScreen> {
           // ── This Week's Setlist ─────────────────────────
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: const [
-              Text(
+            children: [
+              const Text(
                 "THIS WEEK'S SETLIST",
                 style: TextStyle(
                   fontSize: 11,
@@ -351,12 +360,18 @@ class _HomeScreenState extends State<HomeScreen> {
                   color: Colors.black54,
                 ),
               ),
-              Text(
-                'View All →',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: appColor,
-                  fontWeight: FontWeight.w600,
+              // View All → navigates to Songs tab
+              GestureDetector(
+                onTap: () {
+                  setState(() => _selectedIndex = 1);
+                },
+                child: const Text(
+                  'View All →',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: appColor,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ),
             ],
@@ -376,11 +391,23 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             child: Column(
               children: [
-                _SongItem(number: 1, title: 'Gratitude', artist: 'Brandon Lake', keyLabel: 'Key of B'),
+                _SongItem(
+                    number: 1,
+                    title: 'Gratitude',
+                    artist: 'Brandon Lake',
+                    keyLabel: 'Key of B'),
                 const Divider(height: 1, indent: 16, endIndent: 16),
-                _SongItem(number: 2, title: 'Worthy of It All', artist: 'CeCe Winans', keyLabel: 'Key of D'),
+                _SongItem(
+                    number: 2,
+                    title: 'Worthy of It All',
+                    artist: 'CeCe Winans',
+                    keyLabel: 'Key of D'),
                 const Divider(height: 1, indent: 16, endIndent: 16),
-                _SongItem(number: 3, title: 'Firm Foundation', artist: 'Cody Carnes', keyLabel: 'Key of Bb'),
+                _SongItem(
+                    number: 3,
+                    title: 'Firm Foundation',
+                    artist: 'Cody Carnes',
+                    keyLabel: 'Key of Bb'),
               ],
             ),
           ),
@@ -411,11 +438,23 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             child: Column(
               children: [
-                _AssignmentItem(month: 'NOV', day: '19', title: 'Evening Worship', role: 'Acoustic Guitar'),
+                _AssignmentItem(
+                    month: 'NOV',
+                    day: '19',
+                    title: 'Evening Worship',
+                    role: 'Acoustic Guitar'),
                 const Divider(height: 1, indent: 16, endIndent: 16),
-                _AssignmentItem(month: 'NOV', day: '26', title: 'Sunday Morning', role: 'Electric Guitar'),
+                _AssignmentItem(
+                    month: 'NOV',
+                    day: '26',
+                    title: 'Sunday Morning',
+                    role: 'Electric Guitar'),
                 const Divider(height: 1, indent: 16, endIndent: 16),
-                _AssignmentItem(month: 'DEC', day: '03', title: 'First Advent', role: 'Acoustic Guitar'),
+                _AssignmentItem(
+                    month: 'DEC',
+                    day: '03',
+                    title: 'First Advent',
+                    role: 'Acoustic Guitar'),
               ],
             ),
           ),
@@ -520,8 +559,8 @@ class _SongItem extends StatelessWidget {
                     style: const TextStyle(
                         fontWeight: FontWeight.w600, fontSize: 14)),
                 Text('$artist • $keyLabel',
-                    style:
-                        const TextStyle(fontSize: 11, color: Colors.grey)),
+                    style: const TextStyle(
+                        fontSize: 11, color: Colors.grey)),
               ],
             ),
           ),
@@ -597,8 +636,8 @@ class _AssignmentItem extends StatelessWidget {
                     style: const TextStyle(
                         fontWeight: FontWeight.w600, fontSize: 14)),
                 Text(role,
-                    style:
-                        const TextStyle(fontSize: 11, color: Colors.grey)),
+                    style: const TextStyle(
+                        fontSize: 11, color: Colors.grey)),
               ],
             ),
           ),

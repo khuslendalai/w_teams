@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'home_screen.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-
+import 'signup_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -15,29 +15,30 @@ class _LoginScreenState extends State<LoginScreen> {
   final TextEditingController _passwordController = TextEditingController();
 
   void _handleLogin() async {
-  try {
-    await FirebaseAuth.instance.signInWithEmailAndPassword(
-      email: _emailController.text.trim(),
-      password: _passwordController.text,
-    );
+    try {
+      await FirebaseAuth.instance.signInWithEmailAndPassword(
+        email: _emailController.text.trim(),
+        password: _passwordController.text,
+      );
 
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(
-        builder: (context) => HomeScreen(email: _emailController.text.trim()),
-      ),
-    );
-  } on FirebaseAuthException catch (e) {
-    String message = 'Login failed.';
-    if (e.code == 'user-not-found') message = 'No account found for that email.';
-    if (e.code == 'wrong-password') message = 'Wrong password. Try again.';
-    if (e.code == 'invalid-email') message = 'Invalid email address.';
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (context) =>
+              HomeScreen(email: _emailController.text.trim()),
+        ),
+      );
+    } on FirebaseAuthException catch (e) {
+      String message = 'Login failed.';
+      if (e.code == 'user-not-found') message = 'No account found for that email.';
+      if (e.code == 'wrong-password') message = 'Wrong password. Try again.';
+      if (e.code == 'invalid-email') message = 'Invalid email address.';
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
-    );
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(message)),
+      );
+    }
   }
-}
 
   @override
   void dispose() {
@@ -57,15 +58,16 @@ class _LoginScreenState extends State<LoginScreen> {
             mainAxisAlignment: MainAxisAlignment.center,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              //app logo title
+
+              // App logo & title
               const Icon(
                 Icons.music_note,
                 size: 80,
-                color: Color.fromARGB(255, 1, 4, 104)
+                color: Color.fromARGB(255, 1, 4, 104),
               ),
               const SizedBox(height: 16),
               const Text(
-                'w_teams',
+                'W Teams',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 32,
@@ -80,7 +82,7 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
               const SizedBox(height: 48),
 
-              //email 
+              // Email
               TextField(
                 controller: _emailController,
                 keyboardType: TextInputType.emailAddress,
@@ -94,7 +96,7 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
               const SizedBox(height: 16),
 
-              //password 
+              // Password
               TextField(
                 controller: _passwordController,
                 obscureText: true,
@@ -108,7 +110,7 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
               const SizedBox(height: 28),
 
-              //login btn
+              // Login button
               ElevatedButton(
                 onPressed: _handleLogin,
                 style: ElevatedButton.styleFrom(
@@ -124,6 +126,35 @@ class _LoginScreenState extends State<LoginScreen> {
                   style: TextStyle(fontSize: 16),
                 ),
               ),
+              const SizedBox(height: 16),
+
+              // Sign up link
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Text(
+                    "Don't have an account? ",
+                    style: TextStyle(color: Colors.grey),
+                  ),
+                  GestureDetector(
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (context) => const SignupScreen()),
+                      );
+                    },
+                    child: const Text(
+                      'Sign Up',
+                      style: TextStyle(
+                        color: Color.fromARGB(255, 1, 4, 104),
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+
             ],
           ),
         ),
