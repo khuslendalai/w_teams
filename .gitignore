@@ -62,3 +62,14 @@ GeneratedPluginRegistrant.java
 key.properties
 **/*.keystore
 **/*.jks
+
+# Android
+**/android/gradlew
+**/android/gradlew.bat
+**/android/.gradle
+**/android/captures/
+**/android/local.properties
+**/android/**/GeneratedPluginRegistrant.java
+
+# Google Services (contains sensitive Firebase config)
+**/android/app/google-services.json
