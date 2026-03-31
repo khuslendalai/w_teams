@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
-import '/models/member_model.dart';
-import '/services/member_service.dart';
+import '../models/member_model.dart';
+import '../services/member_service.dart';
+import '../services/team_service.dart';
 
 class AddMemberScreen extends StatefulWidget {
   const AddMemberScreen({super.key});
@@ -16,6 +17,7 @@ class _AddMemberScreenState extends State<AddMemberScreen> {
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
   final _memberService = MemberService();
+  final _teamService = TeamService();
 
   String _selectedRole = 'Acoustic Guitar';
   bool _isSaving = false;
@@ -38,19 +40,37 @@ class _AddMemberScreenState extends State<AddMemberScreen> {
     super.dispose();
   }
 
-  // ── Save Member ───────────────────────────────────────────
+  // ── Save Member ───────────────────────────────────────
   Future<void> _saveMember() async {
     if (!_formKey.currentState!.validate()) return;
-
     setState(() => _isSaving = true);
 
     try {
+      // Get current user's teamId
+      final teamId = await _teamService.getCurrentTeamId();
+
+      if (teamId == null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'You are not part of a team yet. Create or join a team first.',
+              ),
+              backgroundColor: Colors.redAccent,
+            ),
+          );
+        }
+        return;
+      }
+
       final member = Member(
         id: '',
         name: _nameController.text.trim(),
         role: _selectedRole,
         email: _emailController.text.trim(),
+        teamId: teamId,
       );
+
       await _memberService.addMember(member);
 
       if (mounted) {
@@ -85,10 +105,7 @@ class _AddMemberScreenState extends State<AddMemberScreen> {
         foregroundColor: Colors.white,
         title: const Text(
           'Add New Member',
-          style: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-          ),
+          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
         ),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new_rounded),
@@ -104,7 +121,7 @@ class _AddMemberScreenState extends State<AddMemberScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
 
-              // ── Avatar Preview ─────────────────────────────
+              // ── Avatar Preview ─────────────────────────
               Center(
                 child: CircleAvatar(
                   radius: 40,
@@ -117,7 +134,8 @@ class _AddMemberScreenState extends State<AddMemberScreen> {
                       final initials = text.isEmpty
                           ? '?'
                           : parts.length >= 2
-                              ? '${parts[0][0]}${parts[1][0]}'.toUpperCase()
+                              ? '${parts[0][0]}${parts[1][0]}'
+                                  .toUpperCase()
                               : parts[0][0].toUpperCase();
                       return Text(
                         initials,
@@ -133,7 +151,7 @@ class _AddMemberScreenState extends State<AddMemberScreen> {
               ),
               const SizedBox(height: 28),
 
-              // ── Section Label ──────────────────────────────
+              // ── Section Label ──────────────────────────
               const Text(
                 'MEMBER DETAILS',
                 style: TextStyle(
@@ -145,7 +163,7 @@ class _AddMemberScreenState extends State<AddMemberScreen> {
               ),
               const SizedBox(height: 12),
 
-              // ── Form Card ──────────────────────────────────
+              // ── Form Card ──────────────────────────────
               Container(
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
@@ -162,7 +180,7 @@ class _AddMemberScreenState extends State<AddMemberScreen> {
                 child: Column(
                   children: [
 
-                    // ── Full Name ────────────────────────────
+                    // ── Full Name ────────────────────────
                     TextFormField(
                       controller: _nameController,
                       textCapitalization: TextCapitalization.words,
@@ -182,7 +200,7 @@ class _AddMemberScreenState extends State<AddMemberScreen> {
                     ),
                     const SizedBox(height: 16),
 
-                    // ── Role Dropdown ────────────────────────
+                    // ── Role Dropdown ────────────────────
                     DropdownButtonFormField<String>(
                       value: _selectedRole,
                       decoration: _inputDecoration(
@@ -209,7 +227,7 @@ class _AddMemberScreenState extends State<AddMemberScreen> {
                     ),
                     const SizedBox(height: 16),
 
-                    // ── Email ────────────────────────────────
+                    // ── Email ────────────────────────────
                     TextFormField(
                       controller: _emailController,
                       keyboardType: TextInputType.emailAddress,
@@ -230,13 +248,12 @@ class _AddMemberScreenState extends State<AddMemberScreen> {
                         return null;
                       },
                     ),
-
                   ],
                 ),
               ),
               const SizedBox(height: 32),
 
-              // ── Save Button ────────────────────────────────
+              // ── Save Button ────────────────────────────
               SizedBox(
                 width: double.infinity,
                 height: 52,
@@ -276,7 +293,6 @@ class _AddMemberScreenState extends State<AddMemberScreen> {
                         ),
                 ),
               ),
-
             ],
           ),
         ),
@@ -284,7 +300,7 @@ class _AddMemberScreenState extends State<AddMemberScreen> {
     );
   }
 
-  // ── Input Decoration Helper ───────────────────────────────
+  // ── Input Decoration Helper ───────────────────────────
   InputDecoration _inputDecoration({
     required String label,
     required IconData icon,

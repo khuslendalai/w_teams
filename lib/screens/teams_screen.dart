@@ -3,6 +3,7 @@ import '../models/member_model.dart';
 import '../services/member_service.dart';
 import 'add_member_screen.dart';
 import 'create_team_screen.dart';
+import 'join_team_screen.dart';
 
 class TeamsScreen extends StatelessWidget {
   const TeamsScreen({super.key});
@@ -103,6 +104,49 @@ class TeamsScreen extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 24),
+
+          const SizedBox(height: 12),
+
+          // ── Join Team Button ───────────────────────────────── 
+          GestureDetector(
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => const JoinTeamScreen(),
+              ),
+            ),
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: Colors.grey.shade300),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.05),
+                    blurRadius: 6,
+                    offset: const Offset(0, 3),
+                  ),
+                ],
+              ),
+              child: const Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.login_outlined, color: Colors.grey, size: 20),
+                  SizedBox(width: 10),
+                  Text(
+                    'Join a Team',
+                    style: TextStyle(
+                      color: Colors.grey,
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
 
           // ── Members Label ────────────────────────────────
           const Text(
