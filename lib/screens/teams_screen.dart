@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../models/member_model.dart';
 import '../services/member_service.dart';
 import 'add_member_screen.dart';
+import 'create_team_screen.dart';
 
 class TeamsScreen extends StatelessWidget {
   const TeamsScreen({super.key});
@@ -50,6 +51,49 @@ class TeamsScreen extends StatelessWidget {
                     'Add New Member',
                     style: TextStyle(
                       color: Colors.white,
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+
+          // ── Create Team Button ───────────────────────────
+          GestureDetector(
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => const CreateTeamScreen(),
+              ),
+            ),
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: appColor),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.05),
+                    blurRadius: 6,
+                    offset: const Offset(0, 3),
+                  ),
+                ],
+              ),
+              child: const Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.group_add_outlined,
+                      color: appColor, size: 20),
+                  SizedBox(width: 10),
+                  Text(
+                    'Create New Team',
+                    style: TextStyle(
+                      color: appColor,
                       fontSize: 15,
                       fontWeight: FontWeight.bold,
                     ),
