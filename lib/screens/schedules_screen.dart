@@ -1,4 +1,6 @@
-﻿import 'package:flutter/material.dart';
+﻿import 'dart:async';
+
+import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../services/team_service.dart';
@@ -530,6 +532,7 @@ class _EventCardState extends State<_EventCard> {
   bool _isLoading = true;
   String? _invitationStatus;
   String? _invitationId;
+  StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _invitationSubscription;
 
   @override
   void initState() {
@@ -537,32 +540,45 @@ class _EventCardState extends State<_EventCard> {
     _loadContext();
   }
 
+  @override
+  void dispose() {
+    _invitationSubscription?.cancel();
+    super.dispose();
+  }
+
   Future<void> _loadContext() async {
     final role = await TeamService().getCurrentUserRole();
     final userEmail = FirebaseAuth.instance.currentUser?.email?.toLowerCase();
 
-    String? invitationId;
-    String? invitationStatus;
-
     if (userEmail != null) {
-      final invitationSnap = await FirebaseFirestore.instance
+      _invitationSubscription = FirebaseFirestore.instance
           .collection('invitations')
           .where('eventId', isEqualTo: widget.event.id)
           .where('memberEmail', isEqualTo: userEmail)
           .limit(1)
-          .get();
+          .snapshots()
+          .listen((snapshot) {
+        if (!mounted) return;
 
-      if (invitationSnap.docs.isNotEmpty) {
-        invitationId = invitationSnap.docs.first.id;
-        invitationStatus = invitationSnap.docs.first.data()['status']?.toString();
-      }
+        if (snapshot.docs.isNotEmpty) {
+          final doc = snapshot.docs.first;
+          final status = doc.data()['status']?.toString();
+          setState(() {
+            _invitationId = doc.id;
+            _invitationStatus = status;
+          });
+        } else {
+          setState(() {
+            _invitationId = null;
+            _invitationStatus = null;
+          });
+        }
+      });
     }
 
     if (mounted) {
       setState(() {
         _isAdmin = role == 'admin';
-        _invitationId = invitationId;
-        _invitationStatus = invitationStatus;
         _isLoading = false;
       });
     }
@@ -617,7 +633,20 @@ class _EventCardState extends State<_EventCard> {
 
   @override
   Widget build(BuildContext context) {
-    final isPending = widget.event.status != 'Confirmed';
+    final hasAccepted = _invitationStatus == 'Accepted';
+    final hasDeclined = _invitationStatus == 'Declined';
+    final displayStatus = hasAccepted
+        ? 'Accepted'
+        : hasDeclined
+            ? 'Declined'
+            : widget.event.status;
+
+    final statusColor = displayStatus == 'Confirmed' || displayStatus == 'Accepted'
+        ? Colors.green
+        : displayStatus == 'Declined'
+            ? Colors.red
+            : Colors.orange;
+
     final dateLabel = '${widget.event.eventDateTime.month.toString().padLeft(2, '0')}/${widget.event.eventDateTime.day.toString().padLeft(2, '0')}/${widget.event.eventDateTime.year}';
     final hour = widget.event.eventDateTime.hour == 0 ? 12 : (widget.event.eventDateTime.hour > 12 ? widget.event.eventDateTime.hour - 12 : widget.event.eventDateTime.hour);
     final period = widget.event.eventDateTime.hour >= 12 ? 'PM' : 'AM';
@@ -640,16 +669,16 @@ class _EventCardState extends State<_EventCard> {
             children: [
               Expanded(
                 child: Text(widget.event.title,
-                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black)),
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: statusColor)),
               ),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
-                  color: isPending ? Colors.orange.withOpacity(0.1) : Colors.green.withOpacity(0.1),
+                  color: statusColor.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(20),
                 ),
-                child: Text(widget.event.status,
-                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: isPending ? Colors.orange : Colors.green)),
+                child: Text(displayStatus,
+                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: statusColor)),
               ),
             ],
           ),
