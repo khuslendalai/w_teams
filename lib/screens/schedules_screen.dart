@@ -1,138 +1,381 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import '../services/team_service.dart';
 
-class ScheduleScreen extends StatelessWidget {
+const scheduleAppColor = Color.fromARGB(255, 1, 4, 104);
+
+class EventItem {
+  final String id;
+  final String title;
+  final String description;
+  final DateTime eventDateTime;
+  final String location;
+  final String status;
+  final String teamId;
+
+  EventItem({
+    required this.id,
+    required this.title,
+    required this.description,
+    required this.eventDateTime,
+    required this.location,
+    required this.status,
+    required this.teamId,
+  });
+
+  factory EventItem.fromFirestore(DocumentSnapshot doc) {
+    final data = doc.data() as Map<String, dynamic>?;
+    final eventDateTimestamp = data?['eventDateTime'] as Timestamp?;
+
+    return EventItem(
+      id: doc.id,
+      title: data?['title'] ?? '',
+      description: data?['description'] ?? '',
+      eventDateTime: eventDateTimestamp?.toDate() ?? DateTime.now(),
+      location: data?['location'] ?? '',
+      status: data?['status'] ?? 'Pending',
+      teamId: data?['teamId'] ?? '',
+    );
+  }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'title': title,
+      'description': description,
+      'eventDateTime': eventDateTime,
+      'location': location,
+      'status': status,
+      'teamId': teamId,
+      'createdAt': DateTime.now(),
+    };
+  }
+}
+
+class ScheduleScreen extends StatefulWidget {
   const ScheduleScreen({super.key});
 
-  final List<Map<String, String>> schedules = const [
-    {
-      'month': 'NOV',
-      'day': '12',
-      'time': '9:00 AM',
-      'title': 'Sunday Morning Service',
-      'role': 'Acoustic Guitar',
-      'location': 'Main Sanctuary',
-      'status': 'Confirmed',
-    },
-    {
-      'month': 'NOV',
-      'day': '19',
-      'time': '6:00 PM',
-      'title': 'Evening Worship',
-      'role': 'Acoustic Guitar',
-      'location': 'Main Sanctuary',
+  @override
+  State<ScheduleScreen> createState() => _ScheduleScreenState();
+}
+
+class _ScheduleScreenState extends State<ScheduleScreen> {
+  final TeamService _teamService = TeamService();
+
+  String? _teamId;
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadTeamId();
+  }
+
+  Future<void> _loadTeamId() async {
+    final teamId = await _teamService.getCurrentTeamId();
+    if (mounted) {
+      setState(() {
+        _teamId = teamId;
+        _isLoading = false;
+      });
+    }
+  }
+
+  Stream<List<EventItem>> _eventsStream() {
+    if (_teamId == null) {
+      return const Stream.empty();
+    }
+
+    return FirebaseFirestore.instance
+        .collection('events')
+        .where('teamId', isEqualTo: _teamId)
+        .snapshots()
+        .map((snapshot) {
+          final events = snapshot.docs
+              .map((doc) => EventItem.fromFirestore(doc))
+              .toList();
+          events.sort((a, b) => a.eventDateTime.compareTo(b.eventDateTime));
+          return events;
+        });
+  }
+
+  Future<void> _createEvent() async {
+    final titleController = TextEditingController();
+    final descriptionController = TextEditingController();
+    final locationController = TextEditingController();
+    DateTime? selectedDate;
+    TimeOfDay? selectedTime;
+
+    final save = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(builder: (context, setState) {
+          String formatTime(TimeOfDay? time) {
+            if (time == null) return 'Select time';
+            final hour = time.hourOfPeriod == 0 ? 12 : time.hourOfPeriod;
+            final period = time.period == DayPeriod.am ? 'AM' : 'PM';
+            return '$hour:${time.minute.toString().padLeft(2, '0')} $period';
+          }
+
+          return AlertDialog(
+            title: const Text('Create Event'),
+            content: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  TextField(
+                    controller: titleController,
+                    decoration: const InputDecoration(labelText: 'Title'),
+                  ),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: descriptionController,
+                    maxLines: 3,
+                    decoration: const InputDecoration(labelText: 'Description'),
+                  ),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: locationController,
+                    decoration: const InputDecoration(labelText: 'Location'),
+                  ),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Builder(builder: (context) {
+                          final date = selectedDate;
+                          if (date == null) {
+                            return const Text('Pick date');
+                          }
+                          return Text('${date.month.toString().padLeft(2, '0')}/${date.day.toString().padLeft(2, '0')}/${date.year}');
+                        }),
+                      ),
+                      TextButton(
+                        onPressed: () async {
+                          final picked = await showDatePicker(
+                            context: context,
+                            initialDate: DateTime.now(),
+                            firstDate: DateTime.now().subtract(const Duration(days: 1)),
+                            lastDate: DateTime.now().add(const Duration(days: 365)),
+                          );
+                          if (picked != null) setState(() => selectedDate = picked);
+                        },
+                        child: const Text('Date'),
+                      )
+                    ],
+                  ),
+                  Row(
+                    children: [
+                      Expanded(child: Text(formatTime(selectedTime))),
+                      TextButton(
+                        onPressed: () async {
+                          final picked = await showTimePicker(
+                            context: context,
+                            initialTime: TimeOfDay.now(),
+                          );
+                          if (picked != null) setState(() => selectedTime = picked);
+                        },
+                        child: const Text('Time'),
+                      )
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+              TextButton(
+                onPressed: () {
+                  if (titleController.text.trim().isEmpty ||
+                      locationController.text.trim().isEmpty ||
+                      selectedDate == null ||
+                      selectedTime == null) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Please complete required fields'),
+                        backgroundColor: Colors.redAccent,
+                      ),
+                    );
+                    return;
+                  }
+                  Navigator.pop(context, true);
+                },
+                child: const Text('Save'),
+              ),
+            ],
+          );
+        });
+      },
+    );
+
+    if (save != true || _teamId == null) return;
+
+    final eventDateTime = DateTime(
+      selectedDate!.year,
+      selectedDate!.month,
+      selectedDate!.day,
+      selectedTime!.hour,
+      selectedTime!.minute,
+    );
+
+    final eventRef = await FirebaseFirestore.instance.collection('events').add({
+      'teamId': _teamId,
+      'title': titleController.text.trim(),
+      'description': descriptionController.text.trim(),
+      'location': locationController.text.trim(),
+      'eventDateTime': eventDateTime,
       'status': 'Pending',
-    },
-    {
-      'month': 'NOV',
-      'day': '26',
-      'time': '9:00 AM',
-      'title': 'Sunday Morning',
-      'role': 'Electric Guitar',
-      'location': 'Chapel Hall',
-      'status': 'Confirmed',
-    },
-    {
-      'month': 'DEC',
-      'day': '03',
-      'time': '9:00 AM',
-      'title': 'First Advent',
-      'role': 'Acoustic Guitar',
-      'location': 'Main Sanctuary',
-      'status': 'Pending',
-    },
-    {
-      'month': 'DEC',
-      'day': '10',
-      'time': '9:00 AM',
-      'title': 'Second Advent',
-      'role': 'Bass Guitar',
-      'location': 'Main Sanctuary',
-      'status': 'Confirmed',
-    },
-    {
-      'month': 'DEC',
-      'day': '24',
-      'time': '7:00 PM',
-      'title': 'Christmas Eve Service',
-      'role': 'Acoustic Guitar',
-      'location': 'Main Sanctuary',
-      'status': 'Pending',
-    },
-  ];
+      'createdAt': DateTime.now(),
+      'createdBy': FirebaseFirestore.instance.app.name,
+    });
+
+    final membersSnapshot = await FirebaseFirestore.instance
+        .collection('members')
+        .where('teamId', isEqualTo: _teamId)
+        .get();
+
+    for (final memberDoc in membersSnapshot.docs) {
+      await FirebaseFirestore.instance.collection('invitations').add({
+        'eventId': eventRef.id,
+        'teamId': _teamId,
+        'memberId': memberDoc.id,
+        'memberEmail': (memberDoc.data()['email'] ?? '').toString(),
+        'status': 'Sent',
+        'sentAt': DateTime.now(),
+      });
+    }
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Event created and invitations sent')),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    const appColor = Color.fromARGB(255, 1, 4, 104);
+    if (_isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
 
-    // Separate confirmed and pending
-    final confirmed = schedules.where((s) => s['status'] == 'Confirmed').toList();
-    final pending = schedules.where((s) => s['status'] == 'Pending').toList();
+    if (_teamId == null) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('You are not in a team yet.'),
+            const SizedBox(height: 8),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: scheduleAppColor),
+              onPressed: () {},
+              child: const Text('Join or create a team first'),
+            ),
+          ],
+        ),
+      );
+    }
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-
-          // ── Summary Row ────────────────────────────────
           Row(
             children: [
-              Expanded(
-                child: _SummaryCard(
-                  label: 'Confirmed',
-                  count: confirmed.length,
-                  color: Colors.green,
-                  icon: Icons.check_circle_outline,
+              const Expanded(
+                child: Text(
+                  'Schedule',
+                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
                 ),
               ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: _SummaryCard(
-                  label: 'Pending',
-                  count: pending.length,
-                  color: Colors.orange,
-                  icon: Icons.hourglass_empty_outlined,
-                ),
+              ElevatedButton.icon(
+                icon: const Icon(Icons.mail_outline),
+                label: const Text('Invitations'),
+                style: ElevatedButton.styleFrom(backgroundColor: scheduleAppColor),
+                onPressed: () {
+                  final userEmail = FirebaseAuth.instance.currentUser?.email;
+                  if (userEmail == null) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Login required for invitations')),
+                    );
+                    return;
+                  }
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => InvitationsScreen(email: userEmail),
+                    ),
+                  );
+                },
+              ),
+              const SizedBox(width: 10),
+              ElevatedButton.icon(
+                icon: const Icon(Icons.add),
+                label: const Text('Create Event'),
+                style: ElevatedButton.styleFrom(backgroundColor: scheduleAppColor),
+                onPressed: _createEvent,
               ),
             ],
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 12),
+          StreamBuilder<List<EventItem>>(
+            stream: _eventsStream(),
+            builder: (context, snapshot) {
+              if (snapshot.hasError) {
+                return Center(child: Text('Error: ${snapshot.error}'));
+              }
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Center(child: CircularProgressIndicator());
+              }
 
-          // ── Confirmed Section ──────────────────────────
-          const Text(
-            'CONFIRMED',
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w700,
-              letterSpacing: 1.2,
-              color: Colors.black54,
-            ),
-          ),
-          const SizedBox(height: 10),
-          ...confirmed.map((item) => _ScheduleCard(item: item)).toList(),
-          const SizedBox(height: 24),
+              final events = snapshot.data ?? [];
+              final confirmed = events.where((e) => e.status == 'Confirmed').toList();
+              final pending = events.where((e) => e.status != 'Confirmed').toList();
 
-          // ── Pending Section ────────────────────────────
-          const Text(
-            'PENDING RSVP',
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w700,
-              letterSpacing: 1.2,
-              color: Colors.black54,
-            ),
-          ),
-          const SizedBox(height: 10),
-          ...pending.map((item) => _ScheduleCard(item: item)).toList(),
-          const SizedBox(height: 20),
-
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _SummaryCard(
+                          label: 'Confirmed',
+                          count: confirmed.length,
+                          color: Colors.green,
+                          icon: Icons.check_circle_outline,
+                        ),
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: _SummaryCard(
+                          label: 'Pending',
+                          count: pending.length,
+                          color: Colors.orange,
+                          icon: Icons.hourglass_empty_outlined,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 24),
+                  const Text('CONFIRMED', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: 1.2, color: Colors.black54)),
+                  const SizedBox(height: 10),
+                  ...confirmed.map((event) => _EventCard(event: event)).toList(),
+                  const SizedBox(height: 24),
+                  const Text('PENDING RSVP', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: 1.2, color: Colors.black54)),
+                  const SizedBox(height: 10),
+                  ...pending.map((event) => _EventCard(event: event)).toList(),
+                  const SizedBox(height: 20),
+                ],
+              );
+            },
+          )
         ],
       ),
     );
   }
 }
 
-// ── Summary Card ──────────────────────────────────────────
 class _SummaryCard extends StatelessWidget {
   final String label;
   final int count;
@@ -170,16 +413,9 @@ class _SummaryCard extends StatelessWidget {
             children: [
               Text(
                 '$count Events',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: color,
-                ),
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: color),
               ),
-              Text(
-                label,
-                style: const TextStyle(fontSize: 12, color: Colors.grey),
-              ),
+              Text(label, style: const TextStyle(fontSize: 12, color: Colors.grey)),
             ],
           ),
         ],
@@ -188,160 +424,287 @@ class _SummaryCard extends StatelessWidget {
   }
 }
 
-// ── Schedule Card ─────────────────────────────────────────
-class _ScheduleCard extends StatelessWidget {
-  final Map<String, String> item;
+class InvitationsScreen extends StatefulWidget {
+  final String email;
 
-  const _ScheduleCard({required this.item});
+  const InvitationsScreen({required this.email});
+
+  @override
+  State<InvitationsScreen> createState() => _InvitationsScreenState();
+}
+
+class _InvitationsScreenState extends State<InvitationsScreen> {
+  Stream<QuerySnapshot> _invitationsStream() {
+    return FirebaseFirestore.instance
+        .collection('invitations')
+        .where('memberEmail', isEqualTo: widget.email.toLowerCase())
+        .snapshots();
+  }
+
+  Future<void> _setInvitationStatus(DocumentSnapshot invitationDoc, String status) async {
+    try {
+      await FirebaseFirestore.instance.collection('invitations').doc(invitationDoc.id).update({
+            'status': status,
+            'respondedAt': DateTime.now(),
+          });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('RSVP set to $status')));
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to set RSVP: $e')));
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    const appColor = Color.fromARGB(255, 1, 4, 104);
-    final isPending = item['status'] == 'Pending';
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Your Invitations'),
+        backgroundColor: scheduleAppColor,
+      ),
+      body: StreamBuilder<QuerySnapshot>(
+        stream: _invitationsStream(),
+        builder: (context, snapshot) {
+          if (snapshot.hasError) {
+            return Center(child: Text('Error: ${snapshot.error}'));
+          }
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+
+          final invitations = snapshot.data?.docs ?? [];
+          if (invitations.isEmpty) {
+            return const Center(child: Text('No invitations found'));
+          }
+
+          return ListView.builder(
+            padding: const EdgeInsets.all(12),
+            itemCount: invitations.length,
+            itemBuilder: (context, index) {
+              final invitation = invitations[index];
+              final data = invitation.data() as Map<String, dynamic>;
+              final status = data['status']?.toString() ?? 'Sent';
+              final eventId = data['eventId']?.toString() ?? '';
+
+              return Card(
+                margin: const EdgeInsets.only(bottom: 10),
+                child: ListTile(
+                  title: Text('Event $eventId', style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+                  subtitle: Text('Status: $status', style: const TextStyle(color: Colors.black)),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      TextButton(
+                        onPressed: () => _setInvitationStatus(invitation, 'Accepted'),
+                        child: const Text('Accept'),
+                      ),
+                      TextButton(
+                        onPressed: () => _setInvitationStatus(invitation, 'Declined'),
+                        child: const Text('Decline'),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _EventCard extends StatefulWidget {
+  final EventItem event;
+
+  const _EventCard({required this.event});
+
+  @override
+  State<_EventCard> createState() => _EventCardState();
+}
+
+class _EventCardState extends State<_EventCard> {
+  bool _isAdmin = false;
+  bool _isLoading = true;
+  String? _invitationStatus;
+  String? _invitationId;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadContext();
+  }
+
+  Future<void> _loadContext() async {
+    final role = await TeamService().getCurrentUserRole();
+    final userEmail = FirebaseAuth.instance.currentUser?.email?.toLowerCase();
+
+    String? invitationId;
+    String? invitationStatus;
+
+    if (userEmail != null) {
+      final invitationSnap = await FirebaseFirestore.instance
+          .collection('invitations')
+          .where('eventId', isEqualTo: widget.event.id)
+          .where('memberEmail', isEqualTo: userEmail)
+          .limit(1)
+          .get();
+
+      if (invitationSnap.docs.isNotEmpty) {
+        invitationId = invitationSnap.docs.first.id;
+        invitationStatus = invitationSnap.docs.first.data()['status']?.toString();
+      }
+    }
+
+    if (mounted) {
+      setState(() {
+        _isAdmin = role == 'admin';
+        _invitationId = invitationId;
+        _invitationStatus = invitationStatus;
+        _isLoading = false;
+      });
+    }
+  }
+
+  Future<void> _setInvitationStatus(String status) async {
+    final userEmail = FirebaseAuth.instance.currentUser?.email?.toLowerCase();
+    if (userEmail == null || widget.event.teamId.isEmpty) return;
+
+    try {
+      if (_invitationId != null) {
+        await FirebaseFirestore.instance
+            .collection('invitations')
+            .doc(_invitationId)
+            .update({'status': status, 'respondedAt': DateTime.now()});
+      } else {
+        final doc = await FirebaseFirestore.instance.collection('invitations').add({
+          'eventId': widget.event.id,
+          'teamId': widget.event.teamId,
+          'memberEmail': userEmail,
+          'status': status,
+          'sentAt': DateTime.now(),
+          'respondedAt': DateTime.now(),
+        });
+        _invitationId = doc.id;
+      }
+      if (mounted) {
+        setState(() => _invitationStatus = status);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Failed to set RSVP: $e'), backgroundColor: Colors.redAccent));
+      }
+    }
+  }
+
+  Future<void> _toggleEventStatus() async {
+    final newStatus = widget.event.status == 'Confirmed' ? 'Pending' : 'Confirmed';
+    try {
+      await FirebaseFirestore.instance
+          .collection('events')
+          .doc(widget.event.id)
+          .update({'status': newStatus});
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Failed to update event status: $e'), backgroundColor: Colors.redAccent));
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isPending = widget.event.status != 'Confirmed';
+    final dateLabel = '${widget.event.eventDateTime.month.toString().padLeft(2, '0')}/${widget.event.eventDateTime.day.toString().padLeft(2, '0')}/${widget.event.eventDateTime.year}';
+    final hour = widget.event.eventDateTime.hour == 0 ? 12 : (widget.event.eventDateTime.hour > 12 ? widget.event.eventDateTime.hour - 12 : widget.event.eventDateTime.hour);
+    final period = widget.event.eventDateTime.hour >= 12 ? 'PM' : 'AM';
+    final timeLabel = '${hour.toString().padLeft(2, '0')}:${widget.event.eventDateTime.minute.toString().padLeft(2, '0')} $period';
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 6,
-            offset: const Offset(0, 3),
-          ),
+          BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 6, offset: const Offset(0, 3)),
         ],
       ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-
-          // ── Top Row: Date + Title + Status ─────────────
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
+          Row(
+            children: [
+              Expanded(
+                child: Text(widget.event.title,
+                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black)),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: isPending ? Colors.orange.withOpacity(0.1) : Colors.green.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(widget.event.status,
+                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: isPending ? Colors.orange : Colors.green)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(widget.event.description,
+              style: const TextStyle(fontSize: 13, color: Colors.black, fontWeight: FontWeight.w400)),
+          const SizedBox(height: 10),
+          Row(children: [
+            const Icon(Icons.calendar_today, size: 14, color: Colors.black54),
+            const SizedBox(width: 4),
+            Text(dateLabel, style: const TextStyle(fontSize: 12, color: Colors.black)),
+            const SizedBox(width: 16),
+            const Icon(Icons.access_time, size: 14, color: Colors.black54),
+            const SizedBox(width: 4),
+            Text(timeLabel, style: const TextStyle(fontSize: 12, color: Colors.black)),
+          ]),
+          const SizedBox(height: 8),
+          Row(children: [
+            const Icon(Icons.location_on_outlined, size: 14, color: Colors.black54),
+            const SizedBox(width: 4),
+            Text(widget.event.location, style: const TextStyle(fontSize: 12, color: Colors.black)),
+          ]),
+          const SizedBox(height: 12),
+          if (!_isLoading) ...[
+            Row(
               children: [
-
-                // Date badge
-                Container(
-                  width: 48,
-                  padding: const EdgeInsets.symmetric(vertical: 8),
-                  decoration: BoxDecoration(
-                    color: appColor,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Column(
-                    children: [
-                      Text(
-                        item['month']!,
-                        style: const TextStyle(
-                          color: Colors.white60,
-                          fontSize: 9,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      Text(
-                        item['day']!,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ],
-                  ),
+                Text(
+                  'RSVP: ${_invitationStatus ?? 'Not invited'}',
+                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
                 ),
-                const SizedBox(width: 14),
-
-                // Event name & time
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        item['title']!,
-                        style: const TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.black87,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Row(
-                        children: [
-                          const Icon(Icons.access_time_outlined,
-                              size: 12, color: Colors.grey),
-                          const SizedBox(width: 4),
-                          Text(
-                            item['time']!,
-                            style: const TextStyle(
-                                fontSize: 12, color: Colors.grey),
-                          ),
-                        ],
-                      ),
-                    ],
+                const Spacer(),
+                if ((_invitationStatus == null || _invitationStatus == 'Sent' || _invitationStatus == 'Pending'))
+                  TextButton(
+                    onPressed: () => _setInvitationStatus('Accepted'),
+                    child: const Text('Accept'),
                   ),
-                ),
-
-                // Status badge
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: isPending
-                        ? Colors.orange.withOpacity(0.1)
-                        : Colors.green.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(20),
+                if ((_invitationStatus == null || _invitationStatus == 'Sent' || _invitationStatus == 'Pending'))
+                  TextButton(
+                    onPressed: () => _setInvitationStatus('Declined'),
+                    child: const Text('Decline'),
                   ),
-                  child: Text(
-                    item['status']!,
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                      color: isPending ? Colors.orange : Colors.green,
-                    ),
-                  ),
-                ),
               ],
             ),
-          ),
-
-          // ── Divider ────────────────────────────────────
-          const Divider(height: 1, indent: 16, endIndent: 16),
-
-          // ── Bottom Row: Role + Location ─────────────────
-          Padding(
-            padding: const EdgeInsets.symmetric(
-                horizontal: 16, vertical: 12),
-            child: Row(
-              children: [
-                // Assigned Role
-                const Icon(Icons.assignment_outlined,
-                    size: 14, color: appColor),
-                const SizedBox(width: 6),
-                Text(
-                  item['role']!,
-                  style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: appColor,
+            if (_isAdmin)
+              Row(
+                children: [
+                  const Text('Event status:'),
+                  const SizedBox(width: 8),
+                  ElevatedButton(
+                    onPressed: _toggleEventStatus,
+                    child: Text(widget.event.status == 'Confirmed' ? 'Set Pending' : 'Set Confirmed'),
                   ),
-                ),
-                const SizedBox(width: 16),
-
-                // Location
-                const Icon(Icons.location_on_outlined,
-                    size: 14, color: Colors.grey),
-                const SizedBox(width: 4),
-                Text(
-                  item['location']!,
-                  style: const TextStyle(
-                      fontSize: 12, color: Colors.grey),
-                ),
-              ],
-            ),
-          ),
-
+                ],
+              ),
+          ]
         ],
       ),
     );

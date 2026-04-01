@@ -16,24 +16,53 @@ class MemberService {
   }
 
   // ── Real-time stream filtered by teamId ──────────────
-  Stream<List<Member>> getMembers() async* {
-    final teamId = await _getTeamId();
-    if (teamId == null) {
+  Stream<List<Member>> getMembers({String? teamId}) async* {
+    final resolvedTeamId = teamId ?? await _getTeamId();
+    if (resolvedTeamId == null) {
       yield [];
       return;
     }
+
+    // Don't require a composite index (teamId + createdAt) by using where-only.
+    // Sorting can be done on the client if needed.
     yield* _collection
-        .where('teamId', isEqualTo: teamId)
-        .orderBy('createdAt', descending: false)
+        .where('teamId', isEqualTo: resolvedTeamId)
         .snapshots()
         .map((snapshot) => snapshot.docs
             .map((doc) => Member.fromFirestore(doc.data(), doc.id))
             .toList());
   }
 
-  // ── Add member with teamId ───────────────────────────
+  // ── Add or merge member with teamId ──────────────────
   Future<void> addMember(Member member) async {
-    await _collection.add(member.toMap());
+    final query = await _collection
+        .where('teamId', isEqualTo: member.teamId)
+        .where('email', isEqualTo: member.email.trim().toLowerCase())
+        .limit(1)
+        .get();
+
+    if (query.docs.isNotEmpty) {
+      final doc = query.docs.first;
+      final existingRole = (doc.data()['role'] ?? '').toString();
+      final newRoles = <String>{}
+        ..addAll(existingRole
+            .split(',')
+            .map((r) => r.trim())
+            .where((r) => r.isNotEmpty))
+        ..addAll(member.role
+            .split(',')
+            .map((r) => r.trim())
+            .where((r) => r.isNotEmpty));
+      final mergedRole = newRoles.join(', ');
+
+      await _collection.doc(doc.id).update({
+        'name': member.name,
+        'role': mergedRole,
+        'email': member.email.trim().toLowerCase(),
+      });
+    } else {
+      await _collection.add(member.toMap());
+    }
   }
 
   // ── Update member ────────────────────────────────────

@@ -286,7 +286,7 @@ class _JoinTeamScreenState extends State<JoinTeamScreen> {
           width: double.infinity,
           height: 52,
           child: ElevatedButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.pop(context, true),
             style: ElevatedButton.styleFrom(
               backgroundColor: appColor,
               foregroundColor: Colors.white,

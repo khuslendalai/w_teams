@@ -22,6 +22,10 @@ class WTeamsApp extends StatelessWidget {
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: const Color.fromARGB(255, 1, 4, 104)),
         useMaterial3: true,
+        textTheme: ThemeData.light().textTheme.apply(
+              bodyColor: Colors.black,
+              displayColor: Colors.black,
+            ),
       ),
       home: const LoginScreen(),
     );

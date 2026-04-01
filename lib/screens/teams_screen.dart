@@ -1,5 +1,8 @@
+// ignore_for_file: dead_code
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../models/member_model.dart';
 import '../models/team_model.dart';
 import '../services/member_service.dart';
@@ -25,6 +28,7 @@ class _TeamsScreenState extends State<TeamsScreen> {
   Team? _team;
   bool _loadingTeam = true;
   bool _codeVisible = false;
+  String _currentUserRole = 'member';
 
   @override
   void initState() {
@@ -32,8 +36,58 @@ class _TeamsScreenState extends State<TeamsScreen> {
     _loadTeam();
   }
 
+  Future<void> _showSnack(String message, {bool isError = false}) async {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: isError ? Colors.redAccent : appColor,
+      ),
+    );
+  }
+
+  Future<void> _leaveTeam() async {
+    if (_team == null) return;
+
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Leave Team'),
+        content: const Text('Are you sure you want to leave this team?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Leave', style: TextStyle(color: Colors.redAccent))),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
+    try {
+      setState(() => _loadingTeam = true);
+      await _teamService.leaveTeam();
+      if (mounted) {
+        _showSnack('You left the team.');
+        _team = null;
+        _currentUserRole = 'member';
+      }
+    } catch (e) {
+      if (mounted) _showSnack('Failed to leave team: $e', isError: true);
+    } finally {
+      if (mounted) setState(() => _loadingTeam = false);
+    }
+  }
+
   Future<void> _loadTeam() async {
     final teamId = await _teamService.getCurrentTeamId();
+    final role = await _teamService.getCurrentUserRole();
+
+    if (mounted) {
+      setState(() {
+        _currentUserRole = role ?? 'member';
+      });
+    }
+
     if (teamId != null) {
       final team = await _teamService.getTeam(teamId);
       if (mounted) setState(() => _team = team);
@@ -59,21 +113,9 @@ class _TeamsScreenState extends State<TeamsScreen> {
           const SizedBox(height: 20),
 
           // ── Action Buttons ───────────────────────────────
+          // admin-add-member is disabled in code-only join flow.
           if (_team != null) ...[
-            _buildButton(
-              label: 'Add New Member',
-              icon: Icons.person_add_outlined,
-              filled: true,
-              onTap: () async {
-                await Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => const AddMemberScreen(),
-                  ),
-                );
-              },
-            ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 0),
           ],
 
           if (_team == null && !_loadingTeam) ...[
@@ -115,7 +157,20 @@ class _TeamsScreenState extends State<TeamsScreen> {
             StreamBuilder<List<Member>>(
               stream: _memberService.getMembers(),
               builder: (context, snapshot) {
-                final members = snapshot.data ?? [];
+                if (snapshot.hasError) {
+                  return Center(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 20),
+                      child: Text(
+                        'Error loading members: ${snapshot.error}',
+                        style: const TextStyle(color: Colors.red),
+                      ),
+                    ),
+                  );
+                }
+
+                final rawMembers = snapshot.data ?? [];
+                final members = _mergeMembers(rawMembers);
                 final count = members.length;
 
                 return Column(
@@ -192,6 +247,15 @@ class _TeamsScreenState extends State<TeamsScreen> {
                           child: _MemberCard(
                             member: m,
                             memberService: _memberService,
+                            isAdmin: _currentUserRole == 'admin',
+                            onRoleUpdated: (newRole) {
+                              final currentUserEmail = FirebaseAuth.instance.currentUser?.email?.trim().toLowerCase() ?? '';
+                              if (m.email.trim().toLowerCase() == currentUserEmail) {
+                                setState(() {
+                                  _currentUserRole = newRole;
+                                });
+                              }
+                            },
                           ),
                         ),
                       ),
@@ -272,6 +336,23 @@ class _TeamsScreenState extends State<TeamsScreen> {
 
           const SizedBox(height: 16),
           const Divider(color: Colors.white24, height: 1),
+          const SizedBox(height: 16),
+
+          // ── Leave Team Button ──────────────────────────
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: _leaveTeam,
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Colors.white,
+                    side: BorderSide(color: Colors.white.withOpacity(0.7)),
+                  ),
+                  child: const Text('Leave Team'),
+                ),
+              ),
+            ],
+          ),
           const SizedBox(height: 16),
 
           // ── Invite Code Row ────────────────────────────
@@ -501,19 +582,135 @@ class _TeamsScreenState extends State<TeamsScreen> {
       ),
     );
   }
+
+  // ── Merge duplicate member records by email, combining roles
+  List<Member> _mergeMembers(List<Member> rawMembers) {
+    final map = <String, Member>{};
+
+    for (final member in rawMembers) {
+      final key = member.email.trim().toLowerCase();
+      if (key.isEmpty) continue;
+
+      if (map.containsKey(key)) {
+        final existing = map[key]!;
+        final existingRoles = existing.role
+            .split(',')
+            .map((r) => r.trim())
+            .where((r) => r.isNotEmpty)
+            .toSet();
+        final newRoles = member.role
+            .split(',')
+            .map((r) => r.trim())
+            .where((r) => r.isNotEmpty)
+            .toSet();
+
+        final combinedRoles = {...existingRoles, ...newRoles}.join(', ');
+
+        map[key] = Member(
+          id: existing.id,
+          name: existing.name,
+          role: combinedRoles,
+          email: existing.email,
+          teamId: existing.teamId,
+        );
+      } else {
+        map[key] = member;
+      }
+    }
+
+    return map.values.toList();
+  }
 }
 
 // ── Member Card ───────────────────────────────────────────
 class _MemberCard extends StatelessWidget {
   final Member member;
   final MemberService memberService;
+  final bool isAdmin;
+  final void Function(String newRole)? onRoleUpdated;
 
   const _MemberCard({
     required this.member,
     required this.memberService,
+    this.isAdmin = false,
+    this.onRoleUpdated,
   });
 
   static const appColor = Color.fromARGB(255, 1, 4, 104);
+
+  Future<void> _showRoleEditDialog(BuildContext context, bool isSelf, bool isCurrentAdmin) async {
+    final roleController = TextEditingController(text: member.role);
+
+    final newRole = await showDialog<String>(
+      context: context,
+      builder: (ctx) {
+        return AlertDialog(
+          title: const Text('Edit Role'),
+          content: TextField(
+            controller: roleController,
+            decoration: const InputDecoration(labelText: 'Role'),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, null),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, roleController.text.trim()),
+              child: const Text('Save'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (newRole == null || newRole.trim().isEmpty || newRole.trim() == member.role) {
+      return;
+    }
+
+    final normalizedRole = newRole.trim();
+
+    if (isSelf && isCurrentAdmin && normalizedRole != 'admin') {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Admins cannot change their own admin role here.'),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+      }
+      return;
+    }
+
+    try {
+      await memberService.updateMember(
+        member.id,
+        name: member.name,
+        role: normalizedRole,
+        email: member.email,
+      );
+
+      if (isSelf) {
+        await TeamService().updateCurrentUserRole(normalizedRole);
+        onRoleUpdated?.call(normalizedRole);
+      }
+
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Role updated successfully')),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to update role: $e'),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -521,6 +718,10 @@ class _MemberCard extends StatelessWidget {
     final initials = nameParts.length >= 2
         ? '${nameParts[0][0]}${nameParts[1][0]}'
         : nameParts[0][0];
+
+    final currentUserEmail = FirebaseAuth.instance.currentUser?.email?.trim().toLowerCase() ?? '';
+    final isSelf = member.email.trim().toLowerCase() == currentUserEmail;
+    final canEditRole = isAdmin || isSelf;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -584,41 +785,48 @@ class _MemberCard extends StatelessWidget {
                     ],
                   ),
                 ),
+                // ── Role Edit Button (admin or self) ─────────────────
+                if (canEditRole)
+                  IconButton(
+                    icon: const Icon(Icons.edit_outlined,
+                        color: Colors.blueAccent, size: 20),
+                    onPressed: () => _showRoleEditDialog(context, isSelf, isAdmin),
+                  ),
 
-                // ── Delete Button ──────────────────────────
-                IconButton(
-                  icon: const Icon(Icons.delete_outline,
-                      color: Colors.redAccent, size: 20),
-                  onPressed: () async {
-                    final confirm = await showDialog<bool>(
-                      context: context,
-                      builder: (ctx) => AlertDialog(
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16)),
-                        title: const Text('Remove Member'),
-                        content: Text(
-                            'Remove ${member.name} from the team?'),
-                        actions: [
-                          TextButton(
-                            onPressed: () =>
-                                Navigator.pop(ctx, false),
-                            child: const Text('Cancel'),
-                          ),
-                          TextButton(
-                            onPressed: () =>
-                                Navigator.pop(ctx, true),
-                            child: const Text('Remove',
-                                style: TextStyle(
-                                    color: Colors.redAccent)),
-                          ),
-                        ],
-                      ),
-                    );
-                    if (confirm == true) {
-                      await memberService.deleteMember(member.id);
-                    }
-                  },
-                ),
+                // ── Delete Button (admin only) ─────────────────
+                if (isAdmin)
+                  IconButton(
+                    icon: const Icon(Icons.delete_outline,
+                        color: Colors.redAccent, size: 20),
+                    onPressed: () async {
+                      final confirm = await showDialog<bool>(
+                        context: context,
+                        builder: (ctx) => AlertDialog(
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16)),
+                          title: const Text('Remove Member'),
+                          content: Text(
+                              'Remove ${member.name} from the team?'),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(ctx, false),
+                              child: const Text('Cancel'),
+                            ),
+                            TextButton(
+                              onPressed: () => Navigator.pop(ctx, true),
+                              child: const Text('Remove',
+                                  style: TextStyle(
+                                      color: Colors.redAccent)),
+                            ),
+                          ],
+                        ),
+                      );
+
+                      if (confirm == true) {
+                        await memberService.deleteMember(member.id);
+                      }
+                    },
+                  ),
               ],
             ),
           ),
