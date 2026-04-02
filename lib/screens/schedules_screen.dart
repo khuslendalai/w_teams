@@ -101,6 +101,17 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
         });
   }
 
+  Stream<QuerySnapshot<Map<String, dynamic>>> _invitationsStream() {
+    if (_teamId == null) {
+      return const Stream.empty();
+    }
+
+    return FirebaseFirestore.instance
+        .collection('invitations')
+        .where('teamId', isEqualTo: _teamId)
+        .snapshots();
+  }
+
   Future<void> _createEvent() async {
     final titleController = TextEditingController();
     final descriptionController = TextEditingController();
@@ -111,102 +122,119 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     final save = await showDialog<bool>(
       context: context,
       builder: (context) {
-        return StatefulBuilder(builder: (context, setState) {
-          String formatTime(TimeOfDay? time) {
-            if (time == null) return 'Select time';
-            final hour = time.hourOfPeriod == 0 ? 12 : time.hourOfPeriod;
-            final period = time.period == DayPeriod.am ? 'AM' : 'PM';
-            return '$hour:${time.minute.toString().padLeft(2, '0')} $period';
-          }
+        return StatefulBuilder(
+          builder: (context, setState) {
+            String formatTime(TimeOfDay? time) {
+              if (time == null) return 'Select time';
+              final hour = time.hourOfPeriod == 0 ? 12 : time.hourOfPeriod;
+              final period = time.period == DayPeriod.am ? 'AM' : 'PM';
+              return '$hour:${time.minute.toString().padLeft(2, '0')} $period';
+            }
 
-          return AlertDialog(
-            title: const Text('Create Event'),
-            content: SingleChildScrollView(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  TextField(
-                    controller: titleController,
-                    decoration: const InputDecoration(labelText: 'Title'),
-                  ),
-                  const SizedBox(height: 10),
-                  TextField(
-                    controller: descriptionController,
-                    maxLines: 3,
-                    decoration: const InputDecoration(labelText: 'Description'),
-                  ),
-                  const SizedBox(height: 10),
-                  TextField(
-                    controller: locationController,
-                    decoration: const InputDecoration(labelText: 'Location'),
-                  ),
-                  const SizedBox(height: 10),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Builder(builder: (context) {
-                          final date = selectedDate;
-                          if (date == null) {
-                            return const Text('Pick date');
-                          }
-                          return Text('${date.month.toString().padLeft(2, '0')}/${date.day.toString().padLeft(2, '0')}/${date.year}');
-                        }),
+            return AlertDialog(
+              title: const Text('Create Event'),
+              content: SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    TextField(
+                      controller: titleController,
+                      decoration: const InputDecoration(labelText: 'Title'),
+                    ),
+                    const SizedBox(height: 10),
+                    TextField(
+                      controller: descriptionController,
+                      maxLines: 3,
+                      decoration: const InputDecoration(
+                        labelText: 'Description',
                       ),
-                      TextButton(
-                        onPressed: () async {
-                          final picked = await showDatePicker(
-                            context: context,
-                            initialDate: DateTime.now(),
-                            firstDate: DateTime.now().subtract(const Duration(days: 1)),
-                            lastDate: DateTime.now().add(const Duration(days: 365)),
-                          );
-                          if (picked != null) setState(() => selectedDate = picked);
-                        },
-                        child: const Text('Date'),
-                      )
-                    ],
-                  ),
-                  Row(
-                    children: [
-                      Expanded(child: Text(formatTime(selectedTime))),
-                      TextButton(
-                        onPressed: () async {
-                          final picked = await showTimePicker(
-                            context: context,
-                            initialTime: TimeOfDay.now(),
-                          );
-                          if (picked != null) setState(() => selectedTime = picked);
-                        },
-                        child: const Text('Time'),
-                      )
-                    ],
-                  ),
-                ],
+                    ),
+                    const SizedBox(height: 10),
+                    TextField(
+                      controller: locationController,
+                      decoration: const InputDecoration(labelText: 'Location'),
+                    ),
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Builder(
+                            builder: (context) {
+                              final date = selectedDate;
+                              if (date == null) {
+                                return const Text('Pick date');
+                              }
+                              return Text(
+                                '${date.month.toString().padLeft(2, '0')}/${date.day.toString().padLeft(2, '0')}/${date.year}',
+                              );
+                            },
+                          ),
+                        ),
+                        TextButton(
+                          onPressed: () async {
+                            final picked = await showDatePicker(
+                              context: context,
+                              initialDate: DateTime.now(),
+                              firstDate: DateTime.now().subtract(
+                                const Duration(days: 1),
+                              ),
+                              lastDate: DateTime.now().add(
+                                const Duration(days: 365),
+                              ),
+                            );
+                            if (picked != null)
+                              setState(() => selectedDate = picked);
+                          },
+                          child: const Text('Date'),
+                        ),
+                      ],
+                    ),
+                    Row(
+                      children: [
+                        Expanded(child: Text(formatTime(selectedTime))),
+                        TextButton(
+                          onPressed: () async {
+                            final picked = await showTimePicker(
+                              context: context,
+                              initialTime: TimeOfDay.now(),
+                            );
+                            if (picked != null)
+                              setState(() => selectedTime = picked);
+                          },
+                          child: const Text('Time'),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
-            ),
-            actions: [
-              TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
-              TextButton(
-                onPressed: () {
-                  if (titleController.text.trim().isEmpty ||
-                      locationController.text.trim().isEmpty ||
-                      selectedDate == null ||
-                      selectedTime == null) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Please complete required fields'),
-                        backgroundColor: Colors.redAccent,
-                      ),
-                    );
-                    return;
-                  }
-                  Navigator.pop(context, true);
-                },
-                child: const Text('Save'),
-              ),
-            ],
-          );
-        });
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context, false),
+                  child: const Text('Cancel'),
+                ),
+                TextButton(
+                  onPressed: () {
+                    if (titleController.text.trim().isEmpty ||
+                        locationController.text.trim().isEmpty ||
+                        selectedDate == null ||
+                        selectedTime == null) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Please complete required fields'),
+                          backgroundColor: Colors.redAccent,
+                        ),
+                      );
+                      return;
+                    }
+                    Navigator.pop(context, true);
+                  },
+                  child: const Text('Save'),
+                ),
+              ],
+            );
+          },
+        );
       },
     );
 
@@ -269,7 +297,9 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
             const Text('You are not in a team yet.'),
             const SizedBox(height: 8),
             ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: scheduleAppColor),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: scheduleAppColor,
+              ),
               onPressed: () {},
               child: const Text('Join or create a team first'),
             ),
@@ -294,12 +324,16 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
               ElevatedButton.icon(
                 icon: const Icon(Icons.mail_outline),
                 label: const Text('Invitations'),
-                style: ElevatedButton.styleFrom(backgroundColor: scheduleAppColor),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: scheduleAppColor,
+                ),
                 onPressed: () {
                   final userEmail = FirebaseAuth.instance.currentUser?.email;
                   if (userEmail == null) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Login required for invitations')),
+                      const SnackBar(
+                        content: Text('Login required for invitations'),
+                      ),
                     );
                     return;
                   }
@@ -315,12 +349,61 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
               ElevatedButton.icon(
                 icon: const Icon(Icons.add),
                 label: const Text('Create Event'),
-                style: ElevatedButton.styleFrom(backgroundColor: scheduleAppColor),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: scheduleAppColor,
+                ),
                 onPressed: _createEvent,
               ),
             ],
           ),
           const SizedBox(height: 12),
+          StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+            stream: _invitationsStream(),
+            builder: (context, snapshot) {
+              if (snapshot.hasError) {
+                return Center(
+                  child: Text('Invitations error: ${snapshot.error}'),
+                );
+              }
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Center(child: CircularProgressIndicator());
+              }
+
+              final invitations = snapshot.data?.docs ?? [];
+              final acceptedCount = invitations
+                  .where(
+                    (doc) => doc.data()['status']?.toString() == 'Accepted',
+                  )
+                  .length;
+              final pendingCount = invitations.where((doc) {
+                final status = doc.data()['status']?.toString();
+                return status != 'Accepted' && status != 'Declined';
+              }).length;
+
+              return Row(
+                children: [
+                  Expanded(
+                    child: _SummaryCard(
+                      label: 'Confirmed',
+                      count: acceptedCount,
+                      color: Colors.green,
+                      icon: Icons.check_circle_outline,
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: _SummaryCard(
+                      label: 'Pending',
+                      count: pendingCount,
+                      color: Colors.orange,
+                      icon: Icons.hourglass_empty_outlined,
+                    ),
+                  ),
+                ],
+              );
+            },
+          ),
+          const SizedBox(height: 24),
           StreamBuilder<List<EventItem>>(
             stream: _eventsStream(),
             builder: (context, snapshot) {
@@ -332,46 +415,46 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
               }
 
               final events = snapshot.data ?? [];
-              final confirmed = events.where((e) => e.status == 'Confirmed').toList();
-              final pending = events.where((e) => e.status != 'Confirmed').toList();
+              final confirmed = events
+                  .where((e) => e.status == 'Confirmed')
+                  .toList();
+              final pending = events
+                  .where((e) => e.status != 'Confirmed')
+                  .toList();
 
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _SummaryCard(
-                          label: 'Confirmed',
-                          count: confirmed.length,
-                          color: Colors.green,
-                          icon: Icons.check_circle_outline,
-                        ),
-                      ),
-                      const SizedBox(width: 14),
-                      Expanded(
-                        child: _SummaryCard(
-                          label: 'Pending',
-                          count: pending.length,
-                          color: Colors.orange,
-                          icon: Icons.hourglass_empty_outlined,
-                        ),
-                      ),
-                    ],
+                  const Text(
+                    'CONFIRMED',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 1.2,
+                      color: Colors.black54,
+                    ),
                   ),
-                  const SizedBox(height: 24),
-                  const Text('CONFIRMED', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: 1.2, color: Colors.black54)),
                   const SizedBox(height: 10),
-                  ...confirmed.map((event) => _EventCard(event: event)).toList(),
+                  ...confirmed
+                      .map((event) => _EventCard(event: event))
+                      .toList(),
                   const SizedBox(height: 24),
-                  const Text('PENDING RSVP', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: 1.2, color: Colors.black54)),
+                  const Text(
+                    'PENDING RSVP',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 1.2,
+                      color: Colors.black54,
+                    ),
+                  ),
                   const SizedBox(height: 10),
                   ...pending.map((event) => _EventCard(event: event)).toList(),
                   const SizedBox(height: 20),
                 ],
               );
             },
-          )
+          ),
         ],
       ),
     );
@@ -415,9 +498,16 @@ class _SummaryCard extends StatelessWidget {
             children: [
               Text(
                 '$count Events',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: color),
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: color,
+                ),
               ),
-              Text(label, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+              Text(
+                label,
+                style: const TextStyle(fontSize: 12, color: Colors.grey),
+              ),
             ],
           ),
         ],
@@ -443,18 +533,25 @@ class _InvitationsScreenState extends State<InvitationsScreen> {
         .snapshots();
   }
 
-  Future<void> _setInvitationStatus(DocumentSnapshot invitationDoc, String status) async {
+  Future<void> _setInvitationStatus(
+    DocumentSnapshot invitationDoc,
+    String status,
+  ) async {
     try {
-      await FirebaseFirestore.instance.collection('invitations').doc(invitationDoc.id).update({
-            'status': status,
-            'respondedAt': DateTime.now(),
-          });
+      await FirebaseFirestore.instance
+          .collection('invitations')
+          .doc(invitationDoc.id)
+          .update({'status': status, 'respondedAt': DateTime.now()});
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('RSVP set to $status')));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('RSVP set to $status')));
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to set RSVP: $e')));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Failed to set RSVP: $e')));
       }
     }
   }
@@ -493,17 +590,28 @@ class _InvitationsScreenState extends State<InvitationsScreen> {
               return Card(
                 margin: const EdgeInsets.only(bottom: 10),
                 child: ListTile(
-                  title: Text('Event $eventId', style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
-                  subtitle: Text('Status: $status', style: const TextStyle(color: Colors.black)),
+                  title: Text(
+                    'Event $eventId',
+                    style: const TextStyle(
+                      color: Colors.black,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  subtitle: Text(
+                    'Status: $status',
+                    style: const TextStyle(color: Colors.black),
+                  ),
                   trailing: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       TextButton(
-                        onPressed: () => _setInvitationStatus(invitation, 'Accepted'),
+                        onPressed: () =>
+                            _setInvitationStatus(invitation, 'Accepted'),
                         child: const Text('Accept'),
                       ),
                       TextButton(
-                        onPressed: () => _setInvitationStatus(invitation, 'Declined'),
+                        onPressed: () =>
+                            _setInvitationStatus(invitation, 'Declined'),
                         child: const Text('Decline'),
                       ),
                     ],
@@ -530,9 +638,18 @@ class _EventCard extends StatefulWidget {
 class _EventCardState extends State<_EventCard> {
   bool _isAdmin = false;
   bool _isLoading = true;
+  bool _showRSVPDetails = false;
   String? _invitationStatus;
   String? _invitationId;
-  StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _invitationSubscription;
+  StreamSubscription<QuerySnapshot<Map<String, dynamic>>>?
+  _invitationSubscription;
+
+  Stream<QuerySnapshot<Map<String, dynamic>>> _eventInvitationsStream() {
+    return FirebaseFirestore.instance
+        .collection('invitations')
+        .where('eventId', isEqualTo: widget.event.id)
+        .snapshots();
+  }
 
   @override
   void initState() {
@@ -558,22 +675,22 @@ class _EventCardState extends State<_EventCard> {
           .limit(1)
           .snapshots()
           .listen((snapshot) {
-        if (!mounted) return;
+            if (!mounted) return;
 
-        if (snapshot.docs.isNotEmpty) {
-          final doc = snapshot.docs.first;
-          final status = doc.data()['status']?.toString();
-          setState(() {
-            _invitationId = doc.id;
-            _invitationStatus = status;
+            if (snapshot.docs.isNotEmpty) {
+              final doc = snapshot.docs.first;
+              final status = doc.data()['status']?.toString();
+              setState(() {
+                _invitationId = doc.id;
+                _invitationStatus = status;
+              });
+            } else {
+              setState(() {
+                _invitationId = null;
+                _invitationStatus = null;
+              });
+            }
           });
-        } else {
-          setState(() {
-            _invitationId = null;
-            _invitationStatus = null;
-          });
-        }
-      });
     }
 
     if (mounted) {
@@ -595,29 +712,46 @@ class _EventCardState extends State<_EventCard> {
             .doc(_invitationId)
             .update({'status': status, 'respondedAt': DateTime.now()});
       } else {
-        final doc = await FirebaseFirestore.instance.collection('invitations').add({
-          'eventId': widget.event.id,
-          'teamId': widget.event.teamId,
-          'memberEmail': userEmail,
-          'status': status,
-          'sentAt': DateTime.now(),
-          'respondedAt': DateTime.now(),
-        });
+        final doc = await FirebaseFirestore.instance
+            .collection('invitations')
+            .add({
+              'eventId': widget.event.id,
+              'teamId': widget.event.teamId,
+              'memberEmail': userEmail,
+              'status': status,
+              'sentAt': DateTime.now(),
+              'respondedAt': DateTime.now(),
+            });
         _invitationId = doc.id;
       }
+
+      // If a user accepts the invitation, also mark the event as confirmed.
+      if (status == 'Accepted') {
+        await FirebaseFirestore.instance
+            .collection('events')
+            .doc(widget.event.id)
+            .update({'status': 'Confirmed'});
+      }
+
       if (mounted) {
         setState(() => _invitationStatus = status);
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Failed to set RSVP: $e'), backgroundColor: Colors.redAccent));
+          SnackBar(
+            content: Text('Failed to set RSVP: $e'),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
       }
     }
   }
 
   Future<void> _toggleEventStatus() async {
-    final newStatus = widget.event.status == 'Confirmed' ? 'Pending' : 'Confirmed';
+    final newStatus = widget.event.status == 'Confirmed'
+        ? 'Pending'
+        : 'Confirmed';
     try {
       await FirebaseFirestore.instance
           .collection('events')
@@ -626,7 +760,11 @@ class _EventCardState extends State<_EventCard> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Failed to update event status: $e'), backgroundColor: Colors.redAccent));
+          SnackBar(
+            content: Text('Failed to update event status: $e'),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
       }
     }
   }
@@ -638,19 +776,26 @@ class _EventCardState extends State<_EventCard> {
     final displayStatus = hasAccepted
         ? 'Accepted'
         : hasDeclined
-            ? 'Declined'
-            : widget.event.status;
+        ? 'Declined'
+        : widget.event.status;
 
-    final statusColor = displayStatus == 'Confirmed' || displayStatus == 'Accepted'
+    final statusColor =
+        displayStatus == 'Confirmed' || displayStatus == 'Accepted'
         ? Colors.green
         : displayStatus == 'Declined'
-            ? Colors.red
-            : Colors.orange;
+        ? Colors.red
+        : Colors.orange;
 
-    final dateLabel = '${widget.event.eventDateTime.month.toString().padLeft(2, '0')}/${widget.event.eventDateTime.day.toString().padLeft(2, '0')}/${widget.event.eventDateTime.year}';
-    final hour = widget.event.eventDateTime.hour == 0 ? 12 : (widget.event.eventDateTime.hour > 12 ? widget.event.eventDateTime.hour - 12 : widget.event.eventDateTime.hour);
+    final dateLabel =
+        '${widget.event.eventDateTime.month.toString().padLeft(2, '0')}/${widget.event.eventDateTime.day.toString().padLeft(2, '0')}/${widget.event.eventDateTime.year}';
+    final hour = widget.event.eventDateTime.hour == 0
+        ? 12
+        : (widget.event.eventDateTime.hour > 12
+              ? widget.event.eventDateTime.hour - 12
+              : widget.event.eventDateTime.hour);
     final period = widget.event.eventDateTime.hour >= 12 ? 'PM' : 'AM';
-    final timeLabel = '${hour.toString().padLeft(2, '0')}:${widget.event.eventDateTime.minute.toString().padLeft(2, '0')} $period';
+    final timeLabel =
+        '${hour.toString().padLeft(2, '0')}:${widget.event.eventDateTime.minute.toString().padLeft(2, '0')} $period';
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -659,7 +804,11 @@ class _EventCardState extends State<_EventCard> {
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 6, offset: const Offset(0, 3)),
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 6,
+            offset: const Offset(0, 3),
+          ),
         ],
       ),
       child: Column(
@@ -668,54 +817,99 @@ class _EventCardState extends State<_EventCard> {
           Row(
             children: [
               Expanded(
-                child: Text(widget.event.title,
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: statusColor)),
+                child: Text(
+                  widget.event.title,
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: statusColor,
+                  ),
+                ),
               ),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 4,
+                ),
                 decoration: BoxDecoration(
                   color: statusColor.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(20),
                 ),
-                child: Text(displayStatus,
-                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: statusColor)),
+                child: Text(
+                  displayStatus,
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: statusColor,
+                  ),
+                ),
               ),
             ],
           ),
           const SizedBox(height: 6),
-          Text(widget.event.description,
-              style: const TextStyle(fontSize: 13, color: Colors.black, fontWeight: FontWeight.w400)),
+          Text(
+            widget.event.description,
+            style: const TextStyle(
+              fontSize: 13,
+              color: Colors.black,
+              fontWeight: FontWeight.w400,
+            ),
+          ),
           const SizedBox(height: 10),
-          Row(children: [
-            const Icon(Icons.calendar_today, size: 14, color: Colors.black54),
-            const SizedBox(width: 4),
-            Text(dateLabel, style: const TextStyle(fontSize: 12, color: Colors.black)),
-            const SizedBox(width: 16),
-            const Icon(Icons.access_time, size: 14, color: Colors.black54),
-            const SizedBox(width: 4),
-            Text(timeLabel, style: const TextStyle(fontSize: 12, color: Colors.black)),
-          ]),
+          Row(
+            children: [
+              const Icon(Icons.calendar_today, size: 14, color: Colors.black54),
+              const SizedBox(width: 4),
+              Text(
+                dateLabel,
+                style: const TextStyle(fontSize: 12, color: Colors.black),
+              ),
+              const SizedBox(width: 16),
+              const Icon(Icons.access_time, size: 14, color: Colors.black54),
+              const SizedBox(width: 4),
+              Text(
+                timeLabel,
+                style: const TextStyle(fontSize: 12, color: Colors.black),
+              ),
+            ],
+          ),
           const SizedBox(height: 8),
-          Row(children: [
-            const Icon(Icons.location_on_outlined, size: 14, color: Colors.black54),
-            const SizedBox(width: 4),
-            Text(widget.event.location, style: const TextStyle(fontSize: 12, color: Colors.black)),
-          ]),
+          Row(
+            children: [
+              const Icon(
+                Icons.location_on_outlined,
+                size: 14,
+                color: Colors.black54,
+              ),
+              const SizedBox(width: 4),
+              Text(
+                widget.event.location,
+                style: const TextStyle(fontSize: 12, color: Colors.black),
+              ),
+            ],
+          ),
           const SizedBox(height: 12),
           if (!_isLoading) ...[
             Row(
               children: [
                 Text(
                   'RSVP: ${_invitationStatus ?? 'Not invited'}',
-                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
                 const Spacer(),
-                if ((_invitationStatus == null || _invitationStatus == 'Sent' || _invitationStatus == 'Pending'))
+                if ((_invitationStatus == null ||
+                    _invitationStatus == 'Sent' ||
+                    _invitationStatus == 'Pending'))
                   TextButton(
                     onPressed: () => _setInvitationStatus('Accepted'),
                     child: const Text('Accept'),
                   ),
-                if ((_invitationStatus == null || _invitationStatus == 'Sent' || _invitationStatus == 'Pending'))
+                if ((_invitationStatus == null ||
+                    _invitationStatus == 'Sent' ||
+                    _invitationStatus == 'Pending'))
                   TextButton(
                     onPressed: () => _setInvitationStatus('Declined'),
                     child: const Text('Decline'),
@@ -729,11 +923,141 @@ class _EventCardState extends State<_EventCard> {
                   const SizedBox(width: 8),
                   ElevatedButton(
                     onPressed: _toggleEventStatus,
-                    child: Text(widget.event.status == 'Confirmed' ? 'Set Pending' : 'Set Confirmed'),
+                    child: Text(
+                      widget.event.status == 'Confirmed'
+                          ? 'Set Pending'
+                          : 'Set Confirmed',
+                    ),
                   ),
                 ],
               ),
-          ]
+            TextButton(
+              onPressed: () =>
+                  setState(() => _showRSVPDetails = !_showRSVPDetails),
+              child: Text(
+                _showRSVPDetails ? 'Hide RSVP details' : 'View RSVP attendees',
+              ),
+            ),
+            if (_showRSVPDetails)
+              StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                stream: _eventInvitationsStream(),
+                builder: (context, snapshot) {
+                  if (snapshot.hasError) {
+                    return Text(
+                      'RSVP load error: ${snapshot.error}',
+                      style: const TextStyle(color: Colors.red),
+                    );
+                  }
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 8),
+                      child: Center(
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                    );
+                  }
+
+                  final inviteDocs = snapshot.data?.docs ?? [];
+                  final accepted = inviteDocs
+                      .where(
+                        (doc) => doc.data()['status']?.toString() == 'Accepted',
+                      )
+                      .toList();
+                  final declined = inviteDocs
+                      .where(
+                        (doc) => doc.data()['status']?.toString() == 'Declined',
+                      )
+                      .toList();
+                  final pendingInvites = inviteDocs.where((doc) {
+                    final status = doc.data()['status']?.toString();
+                    return status != 'Accepted' && status != 'Declined';
+                  }).toList();
+
+                  const int maxListItems = 10;
+                  Widget buildList(
+                    String label,
+                    List<QueryDocumentSnapshot<Map<String, dynamic>>> list,
+                    Color labelColor,
+                  ) {
+                    if (list.isEmpty) return const SizedBox.shrink();
+
+                    final visible = list.take(maxListItems).toList();
+                    final extraCount = list.length - visible.length;
+
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '$label (${list.length})',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: labelColor,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        ...visible.map((doc) {
+                          final data = doc.data();
+                          final memberEmail =
+                              data['memberEmail']?.toString() ?? 'unknown';
+                          return Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 2),
+                            child: Text(
+                              '- $memberEmail',
+                              style: const TextStyle(fontSize: 12),
+                            ),
+                          );
+                        }).toList(),
+                        if (extraCount > 0)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 4, bottom: 8),
+                            child: Text(
+                              '...and $extraCount more',
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: Colors.black54,
+                              ),
+                            ),
+                          ),
+                        const SizedBox(height: 8),
+                      ],
+                    );
+                  }
+
+                  if (inviteDocs.isEmpty) {
+                    return const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 8),
+                      child: Text(
+                        'No invitation responses yet.',
+                        style: TextStyle(fontSize: 12, color: Colors.black54),
+                      ),
+                    );
+                  }
+
+                  return Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(10),
+                    margin: const EdgeInsets.only(top: 8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF8F8F8),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxHeight: 220),
+                      child: SingleChildScrollView(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            buildList('Accepted', accepted, Colors.green),
+                            buildList('Declined', declined, Colors.red),
+                            buildList('Pending', pendingInvites, Colors.orange),
+                          ],
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+          ],
         ],
       ),
     );

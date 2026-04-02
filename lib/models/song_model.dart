@@ -7,6 +7,7 @@ class Song {
   final int order;
   final String notes;
   final String teamId;
+  final String eventName;
 
   Song({
     required this.id,
@@ -17,6 +18,7 @@ class Song {
     required this.order,
     required this.notes,
     required this.teamId,
+    this.eventName = '',
   });
 
   factory Song.fromFirestore(Map<String, dynamic> data, String id) {
@@ -29,6 +31,7 @@ class Song {
       order: data['order'] ?? 0,
       notes: data['notes'] ?? '',
       teamId: data['teamId'] ?? '',
+      eventName: data['eventName'] ?? '',
     );
   }
 
@@ -41,6 +44,7 @@ class Song {
       'order': order,
       'notes': notes,
       'teamId': teamId,
+      'eventName': eventName,
       'createdAt': DateTime.now(),
     };
   }

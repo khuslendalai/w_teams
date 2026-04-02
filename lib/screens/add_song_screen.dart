@@ -16,6 +16,7 @@ class _AddSongScreenState extends State<AddSongScreen> {
   final _formKey = GlobalKey<FormState>();
   final _titleController = TextEditingController();
   final _artistController = TextEditingController();
+  final _eventController = TextEditingController();
   final _bpmController = TextEditingController();
   final _notesController = TextEditingController();
   final _songService = SongService();
@@ -35,6 +36,7 @@ class _AddSongScreenState extends State<AddSongScreen> {
   void dispose() {
     _titleController.dispose();
     _artistController.dispose();
+    _eventController.dispose();
     _bpmController.dispose();
     _notesController.dispose();
     super.dispose();
@@ -70,6 +72,7 @@ class _AddSongScreenState extends State<AddSongScreen> {
         order: nextOrder,
         notes: _notesController.text.trim(),
         teamId: teamId,
+        eventName: _eventController.text.trim(),
       );
 
       await _songService.addSong(song);
@@ -121,6 +124,25 @@ class _AddSongScreenState extends State<AddSongScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              const Text(
+                'EVENT/SETLIST NAME',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 1.2,
+                  color: Colors.black54,
+                ),
+              ),
+              const SizedBox(height: 8),
+              TextFormField(
+                controller: _eventController,
+                textCapitalization: TextCapitalization.words,
+                decoration: _inputDecoration(
+                  label: 'Event or Setlist name (optional)',
+                  icon: Icons.event,
+                ),
+              ),
+              const SizedBox(height: 18),
 
               // ── Icon ──────────────────────────────────
               Center(

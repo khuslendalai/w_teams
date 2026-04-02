@@ -15,20 +15,23 @@ class SongService {
     return doc.data()?['teamId'];
   }
 
-  // ── Real-time stream ordered by song order ───────────
+  // ── Real-time stream ordered by song order (client-side to avoid Firestore composite index requirement) ───────────
   Stream<List<Song>> getSongs() async* {
     final teamId = await _getTeamId();
     if (teamId == null) {
       yield [];
       return;
     }
-    yield* _collection
-        .where('teamId', isEqualTo: teamId)
-        .orderBy('order', descending: false)
-        .snapshots()
-        .map((snapshot) => snapshot.docs
-            .map((doc) => Song.fromFirestore(doc.data(), doc.id))
-            .toList());
+
+    yield* _collection.where('teamId', isEqualTo: teamId).snapshots().map((
+      snapshot,
+    ) {
+      final songs = snapshot.docs
+          .map((doc) => Song.fromFirestore(doc.data(), doc.id))
+          .toList();
+      songs.sort((a, b) => a.order.compareTo(b.order));
+      return songs;
+    });
   }
 
   // ── Add song ─────────────────────────────────────────
@@ -37,7 +40,8 @@ class SongService {
   }
 
   // ── Update song ──────────────────────────────────────
-  Future<void> updateSong(String id, {
+  Future<void> updateSong(
+    String id, {
     required String title,
     required String artist,
     required String key,
@@ -57,10 +61,7 @@ class SongService {
   Future<void> updateOrder(List<Song> songs) async {
     final batch = FirebaseFirestore.instance.batch();
     for (int i = 0; i < songs.length; i++) {
-      batch.update(
-        _collection.doc(songs[i].id),
-        {'order': i},
-      );
+      batch.update(_collection.doc(songs[i].id), {'order': i});
     }
     await batch.commit();
   }
@@ -74,9 +75,7 @@ class SongService {
   Future<int> getNextOrder() async {
     final teamId = await _getTeamId();
     if (teamId == null) return 0;
-    final snapshot = await _collection
-        .where('teamId', isEqualTo: teamId)
-        .get();
+    final snapshot = await _collection.where('teamId', isEqualTo: teamId).get();
     return snapshot.docs.length;
   }
 }
