@@ -6,10 +6,11 @@ import '../models/team_model.dart';
 class TeamService {
   final _teams = FirebaseFirestore.instance.collection('teams');
   final _users = FirebaseFirestore.instance.collection('users');
+  final _members = FirebaseFirestore.instance.collection('members');
 
   // ── Generate a random 6-char code like AB12CD ──────────
   String _generateCode() {
-    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ0123456789';
     final rand = Random();
     return List.generate(6, (_) => chars[rand.nextInt(chars.length)]).join();
   }
@@ -63,12 +64,32 @@ class TeamService {
   // ── Leave current team ─────────────────────────────────
   Future<void> leaveTeam() async {
     final uid = FirebaseAuth.instance.currentUser?.uid;
+    final email = FirebaseAuth.instance.currentUser?.email?.toLowerCase();
     if (uid == null) return;
 
+    // 1 — Get the user's current teamId before removing it
+    final userDoc = await _users.doc(uid).get();
+    final teamId = userDoc.data()?['teamId']?.toString();
+
+    // 2 — Remove teamId and role from users doc
     await _users.doc(uid).update({
       'teamId': FieldValue.delete(),
       'role': FieldValue.delete(),
     });
+
+    // 3 — Delete their member record(s) from members collection
+    if (teamId != null && email != null) {
+      final memberQuery = await _members
+          .where('teamId', isEqualTo: teamId)
+          .where('email', isEqualTo: email)
+          .get();
+
+      final batch = FirebaseFirestore.instance.batch();
+      for (final doc in memberQuery.docs) {
+        batch.delete(doc.reference);
+      }
+      await batch.commit();
+    }
   }
 
   // ── Get current user's teamId ──────────────────────────

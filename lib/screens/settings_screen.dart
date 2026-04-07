@@ -731,6 +731,7 @@ class _SettingsTile extends StatelessWidget {
     required this.label,
     required this.subtitle,
     required this.onTap,
+    // ignore: unused_element_parameter
     this.subtitleColor,
   });
 
