@@ -43,6 +43,8 @@ class TeamService {
   // ── Join a team using invite code ──────────────────────
   Future<bool> joinTeam(String code) async {
     final uid = FirebaseAuth.instance.currentUser!.uid;
+    final email =
+        FirebaseAuth.instance.currentUser?.email?.toLowerCase() ?? '';
 
     final query = await _teams
         .where('inviteCode', isEqualTo: code.toUpperCase().trim())
@@ -53,10 +55,37 @@ class TeamService {
 
     final teamId = query.docs.first.id;
 
+    // 1 — Link user to team in users collection
     await _users.doc(uid).set({
       'teamId': teamId,
       'role': 'member',
     }, SetOptions(merge: true));
+
+    // 2 — Check if member doc already exists for this email + teamId
+    final existingMember = await _members
+        .where('teamId', isEqualTo: teamId)
+        .where('email', isEqualTo: email)
+        .limit(1)
+        .get();
+
+    // 3 — Only create if not already there
+    if (existingMember.docs.isEmpty) {
+      final displayName =
+          FirebaseAuth.instance.currentUser?.displayName;
+      final emailPrefix = email.split('@')[0];
+      final name =
+          (displayName != null && displayName.isNotEmpty)
+              ? displayName
+              : emailPrefix;
+
+      await _members.add({
+        'name': name,
+        'email': email,
+        'role': 'Member',
+        'teamId': teamId,
+        'createdAt': DateTime.now(),
+      });
+    }
 
     return true;
   }
@@ -64,7 +93,8 @@ class TeamService {
   // ── Leave current team ─────────────────────────────────
   Future<void> leaveTeam() async {
     final uid = FirebaseAuth.instance.currentUser?.uid;
-    final email = FirebaseAuth.instance.currentUser?.email?.toLowerCase();
+    final email =
+        FirebaseAuth.instance.currentUser?.email?.toLowerCase();
     if (uid == null) return;
 
     // 1 — Get the user's current teamId before removing it
@@ -115,9 +145,7 @@ class TeamService {
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) return;
 
-    await _users.doc(uid).update({
-      'role': role,
-    });
+    await _users.doc(uid).update({'role': role});
   }
 
   // ── Get team by id ─────────────────────────────────────

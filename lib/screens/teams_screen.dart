@@ -638,79 +638,148 @@ class _MemberCard extends StatelessWidget {
 
   static const appColor = Color.fromARGB(255, 1, 4, 104);
 
-  Future<void> _showRoleEditDialog(BuildContext context, bool isSelf, bool isCurrentAdmin) async {
-    final roleController = TextEditingController(text: member.role);
+  Future<void> _showRoleEditDialog(
+    BuildContext context, bool isSelf, bool isCurrentAdmin) async {
+  
+  final List<String> roles = [
+    'Acoustic Guitar',
+    'Electric Guitar',
+    'Bass Guitar',
+    'Drums',
+    'Keyboard',
+    'Vocals',
+    'Sound Engineer',
+    'Other',
+  ];
 
-    final newRole = await showDialog<String>(
-      context: context,
-      builder: (ctx) {
-        return AlertDialog(
-          title: const Text('Edit Role'),
-          content: TextField(
-            controller: roleController,
-            decoration: const InputDecoration(labelText: 'Role'),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, null),
-              child: const Text('Cancel'),
+  // If current role isn't in the list, default to first item
+  String selectedRole = roles.contains(member.role)
+      ? member.role
+      : roles.first;
+
+  final newRole = await showDialog<String>(
+    context: context,
+    builder: (ctx) {
+      return StatefulBuilder(
+        builder: (ctx, setDlg) {
+          return AlertDialog(
+            shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16)),
+            title: const Row(
+              children: [
+                Icon(Icons.music_note_outlined,
+                    color: appColor),
+                SizedBox(width: 8),
+                Text(
+                  'Edit Role',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: appColor,
+                    fontSize: 18,
+                  ),
+                ),
+              ],
             ),
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, roleController.text.trim()),
-              child: const Text('Save'),
+            content: DropdownButtonFormField<String>(
+              value: selectedRole,
+              decoration: InputDecoration(
+                labelText: 'Role',
+                prefixIcon: const Icon(
+                    Icons.music_note_outlined,
+                    color: appColor,
+                    size: 20),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide:
+                      const BorderSide(color: appColor, width: 1.5),
+                ),
+                filled: true,
+                fillColor: Colors.grey.shade50,
+              ),
+              items: roles
+                  .map((r) => DropdownMenuItem(
+                        value: r,
+                        child: Text(r),
+                      ))
+                  .toList(),
+              onChanged: (val) {
+                if (val != null) {
+                  setDlg(() => selectedRole = val);
+                }
+              },
             ),
-          ],
-        );
-      },
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, null),
+                child: const Text('Cancel',
+                    style: TextStyle(color: Colors.grey)),
+              ),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: appColor,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10)),
+                ),
+                onPressed: () =>
+                    Navigator.pop(ctx, selectedRole),
+                child: const Text('Save'),
+              ),
+            ],
+          );
+        },
+      );
+    },
+  );
+
+  if (newRole == null || newRole == member.role) return;
+
+  if (isSelf && isCurrentAdmin && newRole != 'admin') {
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+              'Admins cannot change their own admin role here.'),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+    }
+    return;
+  }
+
+  try {
+    await memberService.updateMember(
+      member.id,
+      name: member.name,
+      role: newRole,
+      email: member.email,
     );
 
-    if (newRole == null || newRole.trim().isEmpty || newRole.trim() == member.role) {
-      return;
+    if (isSelf) {
+      await TeamService().updateCurrentUserRole(newRole);
+      onRoleUpdated?.call(newRole);
     }
 
-    final normalizedRole = newRole.trim();
-
-    if (isSelf && isCurrentAdmin && normalizedRole != 'admin') {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Admins cannot change their own admin role here.'),
-            backgroundColor: Colors.redAccent,
-          ),
-        );
-      }
-      return;
-    }
-
-    try {
-      await memberService.updateMember(
-        member.id,
-        name: member.name,
-        role: normalizedRole,
-        email: member.email,
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+            content: Text('Role updated successfully')),
       );
-
-      if (isSelf) {
-        await TeamService().updateCurrentUserRole(normalizedRole);
-        onRoleUpdated?.call(normalizedRole);
-      }
-
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Role updated successfully')),
-        );
-      }
-    } catch (e) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to update role: $e'),
-            backgroundColor: Colors.redAccent,
-          ),
-        );
-      }
+    }
+  } catch (e) {
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to update role: $e'),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
     }
   }
+}
 
   @override
   Widget build(BuildContext context) {

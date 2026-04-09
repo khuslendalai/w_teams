@@ -16,17 +16,22 @@ class _SetlistScreenState extends State<SetlistScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
+    // Check if this screen was pushed onto the nav stack
+    // If so, wrap in Scaffold with AppBar
+    final bool hasNavigator = Navigator.canPop(context);
+
+    final content = SingleChildScrollView(
       padding: const EdgeInsets.all(20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
 
-          // ── Add Song Button ──────────────────────────────
+          // ── Add Song Button ────────────────────────────
           GestureDetector(
             onTap: () => Navigator.push(
               context,
-              MaterialPageRoute(builder: (_) => const AddSongScreen()),
+              MaterialPageRoute(
+                  builder: (_) => const AddSongScreen()),
             ),
             child: Container(
               width: double.infinity,
@@ -45,7 +50,8 @@ class _SetlistScreenState extends State<SetlistScreen> {
               child: const Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.add_outlined, color: Colors.white, size: 20),
+                  Icon(Icons.add_outlined,
+                      color: Colors.white, size: 20),
                   SizedBox(width: 10),
                   Text(
                     'Add Song to Setlist',
@@ -61,7 +67,7 @@ class _SetlistScreenState extends State<SetlistScreen> {
           ),
           const SizedBox(height: 24),
 
-          // ── Setlist Label ────────────────────────────────
+          // ── Setlist Label ──────────────────────────────
           const Text(
             'SETLIST',
             style: TextStyle(
@@ -78,11 +84,12 @@ class _SetlistScreenState extends State<SetlistScreen> {
           ),
           const SizedBox(height: 10),
 
-          // ── Live Firestore List ──────────────────────────
+          // ── Live Firestore List ────────────────────────
           StreamBuilder<List<Song>>(
             stream: _songService.getSongs(),
             builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting) {
+              if (snapshot.connectionState ==
+                  ConnectionState.waiting) {
                 return const Center(
                   child: Padding(
                     padding: EdgeInsets.symmetric(vertical: 40),
@@ -93,7 +100,8 @@ class _SetlistScreenState extends State<SetlistScreen> {
               if (snapshot.hasError) {
                 return Center(
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 40),
+                    padding:
+                        const EdgeInsets.symmetric(vertical: 40),
                     child: Text('Error: ${snapshot.error}'),
                   ),
                 );
@@ -142,6 +150,34 @@ class _SetlistScreenState extends State<SetlistScreen> {
         ],
       ),
     );
+
+    // ── If pushed via Navigator, wrap in Scaffold ────────
+    if (hasNavigator) {
+      return Scaffold(
+        backgroundColor: const Color(0xFFF5F6FA),
+        appBar: AppBar(
+          backgroundColor: appColor,
+          foregroundColor: Colors.white,
+          elevation: 0,
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back_ios_new_rounded),
+            onPressed: () => Navigator.pop(context),
+          ),
+          title: const Text(
+            'Setlist',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+            ),
+          ),
+        ),
+        body: content,
+      );
+    }
+
+    // ── If used as a tab, just return the content ────────
+    return content;
   }
 }
 
@@ -178,7 +214,7 @@ class _SongCard extends StatelessWidget {
       child: Column(
         children: [
 
-          // ── Top Row ──────────────────────────────────────
+          // ── Top Row ────────────────────────────────────
           Padding(
             padding: const EdgeInsets.all(16),
             child: Row(
@@ -269,10 +305,10 @@ class _SongCard extends StatelessWidget {
             ),
           ),
 
-          // ── Divider ──────────────────────────────────────
+          // ── Divider ────────────────────────────────────
           const Divider(height: 1, indent: 16, endIndent: 16),
 
-          // ── Bottom: Key + BPM + Notes ────────────────────
+          // ── Bottom: Key + BPM + Notes ──────────────────
           Padding(
             padding: const EdgeInsets.symmetric(
                 horizontal: 16, vertical: 10),
@@ -339,7 +375,7 @@ class _SongCard extends StatelessWidget {
             ),
           ),
 
-          // ── Notes (if any) ───────────────────────────────
+          // ── Notes (if any) ─────────────────────────────
           if (song.notes.isNotEmpty)
             Padding(
               padding: const EdgeInsets.only(
@@ -361,5 +397,3 @@ class _SongCard extends StatelessWidget {
     );
   }
 }
-
-

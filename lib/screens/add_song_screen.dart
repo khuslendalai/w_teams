@@ -107,14 +107,12 @@ class _AddSongScreenState extends State<AddSongScreen> {
       appBar: AppBar(
         backgroundColor: appColor,
         foregroundColor: Colors.white,
+        automaticallyImplyLeading: true,
         title: const Text(
           'Add Song',
           style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
         ),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded),
-          onPressed: () => Navigator.pop(context),
-        ),
+        leading: const BackButton(color: Colors.white),
         elevation: 0,
       ),
       body: SingleChildScrollView(
