@@ -51,15 +51,16 @@ class Song {
 
   // For reordering — copy with new order
   Song copyWith({int? order}) {
-    return Song(
-      id: id,
-      title: title,
-      artist: artist,
-      key: key,
-      bpm: bpm,
-      order: order ?? this.order,
-      notes: notes,
-      teamId: teamId,
+  return Song(
+    id: id,
+    title: title,
+    artist: artist,
+    key: key,
+    bpm: bpm,
+    order: order ?? this.order,
+    notes: notes,
+    teamId: teamId,
+    eventName: eventName,
     );
   }
 }
