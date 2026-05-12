@@ -26,7 +26,6 @@ lib/
  ├── models/
  ├── screens/
  ├── services/
- ├── widgets/
  └── main.dart
 ```
 
